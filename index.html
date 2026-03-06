@@ -34,43 +34,30 @@
     body { margin: 0; padding: 0; overflow: hidden; font-family: 'Inter', sans-serif; background: #000; }
     #map { height: 100vh; width: 100vw; z-index: 1; }
 
-    /* Auth Navigation */
-    .auth-nav {
-      position: absolute; top: 20px; left: 20px; z-index: 1000;
-      display: flex; gap: 10px;
-    }
-    .auth-btn {
-      background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border);
-      padding: 10px 16px; border-radius: 12px; cursor: pointer; font-weight: 600;
-      backdrop-filter: blur(10px); box-shadow: var(--shadow); transition: 0.2s;
-    }
+    /* UI Components */
+    .auth-nav { position: absolute; top: 20px; left: 20px; z-index: 1000; display: flex; gap: 10px; }
+    .auth-btn { background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border); padding: 10px 16px; border-radius: 12px; cursor: pointer; font-weight: 600; backdrop-filter: blur(10px); box-shadow: var(--shadow); transition: 0.2s; }
+    .theme-toggle { position: absolute; top: 20px; right: 20px; z-index: 1000; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px; width: 44px; height: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); font-size: 1.2rem; }
 
-    /* Modals */
-    .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-      z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px);
-    }
-    .modal-card {
-      background: var(--bg-panel); padding: 30px; border-radius: 24px;
-      width: 320px; color: var(--text-main); border: 1px solid var(--border);
-    }
-    .modal-card input {
-      width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px;
-      border: 1px solid var(--border); background: var(--input-bg); color: var(--text-main); box-sizing: border-box;
-    }
+    /* Modals & Dashboard */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+    .modal-card { background: var(--bg-panel); padding: 30px; border-radius: 24px; color: var(--text-main); border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .modal-card input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text-main); box-sizing: border-box; }
+
+    /* Admin Dashboard Specifics */
+    .admin-card { width: 90%; max-width: 600px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }
+    .user-list { overflow-y: auto; flex: 1; margin-top: 15px; }
+    .user-row { background: var(--input-bg); padding: 15px; border-radius: 16px; margin-bottom: 10px; border: 1px solid var(--border); }
+    .user-controls { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .btn-small { padding: 6px 12px; border-radius: 8px; border: none; font-size: 0.75rem; cursor: pointer; font-weight: 700; transition: 0.2s; }
 
     /* Control Panel */
-    .control-panel {
-      position: absolute; z-index: 1000; background: var(--bg-panel);
-      backdrop-filter: blur(20px); border: 1px solid var(--border);
-      box-shadow: var(--shadow); color: var(--text-main); display: flex; flex-direction: column; max-height: 85vh;
-    }
+    .control-panel { position: absolute; z-index: 1000; background: var(--bg-panel); backdrop-filter: blur(20px); border: 1px solid var(--border); box-shadow: var(--shadow); color: var(--text-main); display: flex; flex-direction: column; max-height: 85vh; }
     @media (min-width: 601px) { .control-panel { bottom: 30px; left: 30px; width: 340px; border-radius: 24px; padding: 24px; } }
     @media (max-width: 600px) { .control-panel { bottom: 20px; left: 5%; right: 5%; width: 90%; border-radius: 28px; padding: 20px; box-sizing: border-box; } }
 
     .option-card { display: flex; align-items: center; padding: 14px; margin: 6px 0; background: var(--input-bg); border-radius: 16px; }
     .btn-apply { background: var(--accent); color: white; border: none; padding: 16px; border-radius: 16px; width: 100%; font-weight: 700; cursor: pointer; margin-top: 10px; }
-    .theme-toggle { position: absolute; top: 20px; right: 20px; z-index: 1000; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px; width: 44px; height: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); font-size: 1.2rem; }
   </style>
 </head>
 <body>
@@ -83,7 +70,7 @@
   <div id="logged-in-ui" style="display:none;">
     <button class="auth-btn" id="user-tag" disabled></button>
     <button class="auth-btn" onclick="handleLogout()">Iziet</button>
-    <button class="auth-btn" id="admin-panel-btn" style="display:none; background:#FF3B30; color:white;" onclick="toggleAdminView()">Admin ⚙️</button>
+    <button class="auth-btn" id="admin-panel-btn" style="display:none; background:#FF3B30; color:white;" onclick="openAdminDashboard()">Admin ⚙️</button>
   </div>
 </div>
 
@@ -91,7 +78,7 @@
 <div id="map"></div>
 
 <div class="modal-overlay" id="auth-modal">
-  <div class="modal-card">
+  <div class="modal-card" style="width:320px;">
     <h2 id="modal-title">Pieteikties</h2>
     <input type="email" id="email" placeholder="E-pasts">
     <input type="password" id="password" placeholder="Parole">
@@ -101,6 +88,20 @@
     </div>
     <button class="btn-apply" onclick="submitAuth()">Apstiprināt</button>
     <button onclick="closeAuth()" style="margin-top:10px; width:100%; background:none; border:none; color:var(--text-main); opacity:0.5; cursor:pointer;">Atcelt</button>
+  </div>
+</div>
+
+<div id="admin-dashboard" class="modal-overlay">
+  <div class="modal-card admin-card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Lietotāju Kontrole</h2>
+      <button onclick="closeAdminDashboard()" class="auth-btn">X</button>
+    </div>
+    <input type="text" id="adminSearch" placeholder="Meklēt lietotāju..." oninput="renderUserList()" style="margin-top:15px;">
+    <div id="user-list" class="user-list"></div>
+    <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top:15px;">
+      <button onclick="resetMap()" style="background:#FF3B30;" class="btn-apply">Atiestatīt visu karti</button>
+    </div>
   </div>
 </div>
 
@@ -136,6 +137,7 @@ const database = firebase.database();
 const auth = firebase.auth();
 
 let userProfile = null;
+let allUsers = {};
 let guestEdits = parseInt(localStorage.getItem('guest_edits')) || 0;
 let isPedestrianUnlocked = false;
 let streetStates = {};
@@ -143,7 +145,7 @@ let streetLayersById = {};
 let selectedLayer = null;
 let currentTheme = localStorage.getItem('theme') || 'light';
 
-// --- AUTH LOGIC ---
+// --- 1. AUTH & PROFILE ---
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     const snapshot = await database.ref('users/' + user.uid).once('value');
@@ -158,12 +160,6 @@ auth.onAuthStateChanged(async (user) => {
     document.getElementById('logged-in-ui').style.display = 'none';
   }
 });
-
-function openAuth(mode) {
-  document.getElementById('auth-modal').style.display = 'flex';
-  document.getElementById('modal-title').innerText = mode === 'login' ? 'Pieteikties' : 'Reģistrēties';
-  document.getElementById('reg-fields').style.display = mode === 'login' ? 'none' : 'block';
-}
 
 async function submitAuth() {
   const email = document.getElementById('email').value;
@@ -182,14 +178,56 @@ async function submitAuth() {
   } catch (e) { alert(e.message); }
 }
 
-function unlockPedestrianFeature() {
-  isPedestrianUnlocked = true;
-  document.getElementById("pedCheck").disabled = false;
-  document.getElementById("pay-notice").style.display = "none";
-  document.getElementById("pedSection").style.opacity = "1";
+// --- 2. ADMIN DASHBOARD LOGIC ---
+async function openAdminDashboard() {
+  document.getElementById('admin-dashboard').style.display = 'flex';
+  const snapshot = await database.ref('users').once('value');
+  allUsers = snapshot.val() || {};
+  renderUserList();
 }
 
-// --- MAP & DATA ---
+function renderUserList() {
+  const list = document.getElementById('user-list');
+  const search = document.getElementById('adminSearch').value.toLowerCase();
+  list.innerHTML = "";
+
+  for (let uid in allUsers) {
+    const u = allUsers[uid];
+    if (u.username?.toLowerCase().includes(search)) {
+      const row = document.createElement('div');
+      row.className = 'user-row';
+      row.innerHTML = `
+        <div style="font-weight:700;">${u.username} <span style="font-weight:400; opacity:0.6; font-size:0.8rem;">(${u.dob})</span></div>
+        <div style="font-size:0.7rem; opacity:0.5; margin-bottom:8px;">UID: ${uid}</div>
+        <div class="user-controls">
+          <button class="btn-small" style="background:${u.isPremium ? '#34C759' : '#8E8E93'}; color:white;" onclick="updateUser('${uid}', {isPremium: ${!u.isPremium}})">
+            ${u.isPremium ? 'Noņemt Premium' : 'Dot Premium'}
+          </button>
+          <button class="btn-small" style="background:#FF3B30; color:white;" onclick="deleteUser('${uid}')">Dzēst</button>
+          ${u.role !== 'admin' ? `<button class="btn-small" style="background:var(--accent); color:white;" onclick="updateUser('${uid}', {role: 'admin'})">Padarīt Admin</button>` : '<b>[ADMIN]</b>'}
+        </div>`;
+      list.appendChild(row);
+    }
+  }
+}
+
+async function updateUser(uid, data) {
+  await database.ref('users/' + uid).update(data);
+  openAdminDashboard();
+}
+
+async function deleteUser(uid) {
+  if (confirm("Dzēst šo lietotāju no datubāzes?")) {
+    await database.ref('users/' + uid).remove();
+    openAdminDashboard();
+  }
+}
+
+function resetMap() {
+  if (confirm("VAI TIEŠĀM izdzēst visus ielu datus?")) database.ref('streets').remove();
+}
+
+// --- 3. CORE MAP & APP LOGIC ---
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([56.5100, 27.3400], 14);
 const tileLayers = {
   light: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'),
@@ -204,7 +242,6 @@ function setTheme(theme) {
   localStorage.setItem('theme', theme);
   currentTheme = theme;
 }
-function toggleTheme() { setTheme(currentTheme === 'light' ? 'dark' : 'light'); }
 setTheme(currentTheme);
 
 function getColor(state) {
@@ -251,7 +288,7 @@ async function loadStreets() {
 
 function applyStatus() {
   if (!auth.currentUser) {
-    if (guestEdits >= 2) { alert("Lūdzu pieteikties, lai turpinātu labot karti!"); return openAuth('login'); }
+    if (guestEdits >= 2) { alert("Lūdzu pieteikties!"); return openAuth('login'); }
     guestEdits++; localStorage.setItem('guest_edits', guestEdits);
   }
   const id = selectedLayer.feature.properties.id;
@@ -262,9 +299,11 @@ function applyStatus() {
   document.getElementById("panel").style.display = "none";
 }
 
-function toggleAdminView() {
-  const choice = prompt("Admin Panel:\n1. Reset Map\n2. Inspect User (Enter Username)");
-  if (choice === "1" && confirm("Izdzēst visus ielu datus?")) database.ref('streets').remove();
+function unlockPedestrianFeature() {
+  isPedestrianUnlocked = true;
+  document.getElementById("pedCheck").disabled = false;
+  document.getElementById("pay-notice").style.display = "none";
+  document.getElementById("pedSection").style.opacity = "1";
 }
 
 paypal.Buttons({
@@ -275,7 +314,10 @@ paypal.Buttons({
   })
 }).render('#paypal-button-container');
 
-function closeAuth() { document.getElementById('auth-modal').style.display = 'none'; }
+function openAuth(m) { document.getElementById('auth-modal').style.display='flex'; document.getElementById('modal-title').innerText=m==='login'?'Pieteikties':'Reģistrēties'; document.getElementById('reg-fields').style.display=m==='login'?'none':'block'; }
+function closeAuth() { document.getElementById('auth-modal').style.display='none'; }
+function closeAdminDashboard() { document.getElementById('admin-dashboard').style.display='none'; }
+function toggleTheme() { setTheme(currentTheme === 'light' ? 'dark' : 'light'); }
 function handleLogout() { auth.signOut().then(() => location.reload()); }
 loadStreets();
 </script>
