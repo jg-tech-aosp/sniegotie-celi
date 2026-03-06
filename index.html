@@ -221,16 +221,6 @@ function unlockPedestrianFeature() {
 function checkPromo() {
   if (document.getElementById("promoInput").value === "BURGER67") unlockPedestrianFeature();
 }
-else if (code === "REZEKNE_RESET_2026") { 
-    if (confirm("⚠️ UZMANĪBU: Vai tiešām vēlaties izdzēst VISUS ielu datus?")) {
-      database.ref('streets').remove()
-        .then(() => {
-          alert("Karte ir pilnībā notīrīta!");
-          location.reload();
-        })
-        .catch(err => alert("Kļūda: " + err));
-    }
-  } 
   else {
     alert("Nepareizs kods!");
   }
@@ -294,6 +284,7 @@ loadStreets();
 </script>
 </body>
 </html>
+
 
 
 
