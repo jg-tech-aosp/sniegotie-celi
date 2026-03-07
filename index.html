@@ -745,7 +745,7 @@ function renderUserList() {
       const row = document.createElement('div');
       row.className = 'user-row';
       row.innerHTML = `
-        <div style="font-weight:700;">${u.username} (${u.dob || '—'})</div>
+        <div style="font-weight:700; cursor:pointer; text-decoration:underline;" onclick="closeAdminDashboard(); openProfile('${uid}', '${u.username}')">${u.username} (${u.dob || '—'})</div>
         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">
           <button class="btn-small" style="background:${u.isPremium ? '#34C759' : '#8E8E93'}; color:white;" onclick="updateAdminUser('${uid}', {isPremium: ${!u.isPremium}})">${u.isPremium ? 'Noņemt Premium' : 'Dot Premium'}</button>
           <button class="btn-small" style="background:${u.bannedDraw ? '#FF9500' : '#8E8E93'}; color:white;" onclick="updateAdminUser('${uid}', {bannedDraw: ${!u.bannedDraw}})">${u.bannedDraw ? '✓ Aizl. zīmēt' : 'Aizliegt zīmēt'}</button>
