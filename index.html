@@ -391,6 +391,7 @@
     <button class="auth-btn" id="user-tag" onclick="openSettings()">Ielādē...</button>
     <button class="auth-btn" onclick="handleLogout()">Iziet</button>
     <button class="auth-btn" id="dm-inbox-btn" onclick="openInbox()" style="position:relative;">📬 <span id="dm-unread-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#FF3B30;color:white;border-radius:50%;width:16px;height:16px;font-size:0.6rem;line-height:16px;text-align:center;">!</span></button>
+    <button class="auth-btn" onclick="openUserSearch()">🔍</button>
     <button class="auth-btn" id="admin-panel-btn" style="display:none; background:#FF3B30; color:white;" onclick="openAdminDashboard()">Admin ⚙️</button>
   </div>
 </div>
@@ -456,11 +457,42 @@
     </div>
     <div id="profile-badge" style="margin:8px 0; font-size:0.85rem;"></div>
     <div id="profile-bio" style="font-size:0.85rem; opacity:0.7; margin-bottom:12px; padding:10px; background:var(--input-bg); border-radius:12px; flex-shrink:0;"></div>
-    <div id="profile-dm-btn-wrap" style="display:none; margin-bottom:12px; flex-shrink:0;">
-      <button id="profile-dm-btn" class="btn-apply" style="margin:0; padding:10px;" onclick="startDM()">💬 Sūtīt ziņu</button>
+    <!-- Follow stats -->
+    <div style="display:flex; gap:16px; margin-bottom:12px; flex-shrink:0;">
+      <span id="profile-followers-count" style="font-size:0.85rem; cursor:pointer;" onclick="openFollowList('followers')"><strong id="profile-followers-num">0</strong> sekotāji</span>
+      <span id="profile-following-count" style="font-size:0.85rem; cursor:pointer;" onclick="openFollowList('following')"><strong id="profile-following-num">0</strong> seko</span>
+    </div>
+    <div id="profile-action-btns" style="display:flex; gap:8px; margin-bottom:12px; flex-shrink:0;">
+      <button id="profile-follow-btn" class="btn-apply" style="display:none; margin:0; padding:10px; flex:1;" onclick="toggleFollow()">Sekot</button>
+      <button id="profile-dm-btn-wrap" class="btn-apply" style="display:none; margin:0; padding:10px; flex:1; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border);" onclick="startDMFromProfile()">💬 Sūtīt ziņu</button>
     </div>
     <div style="font-weight:700; font-size:0.8rem; opacity:0.5; margin-bottom:8px; flex-shrink:0;">ZIŅAS</div>
     <div id="profile-posts" style="overflow-y:auto; flex:1; scrollbar-width:thin;"></div>
+  </div>
+</div>
+
+<!-- Followers/Following List Modal -->
+<div class="modal-overlay" id="follow-list-modal" style="display:none;">
+  <div class="modal-card" style="max-height:70vh; display:flex; flex-direction:column; overflow:hidden; width:320px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+      <h2 style="margin:0;" id="follow-list-title">Sekotāji</h2>
+      <button onclick="closeFollowList()" class="btn-small">X</button>
+    </div>
+    <div id="follow-list-items" style="overflow-y:auto; flex:1; margin-top:12px; scrollbar-width:thin;"></div>
+  </div>
+</div>
+
+<!-- User Search Modal -->
+<div class="modal-overlay" id="user-search-modal" style="display:none;">
+  <div class="modal-card" style="max-height:70vh; display:flex; flex-direction:column; overflow:hidden; width:340px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+      <h2 style="margin:0;">🔍 Meklēt lietotājus</h2>
+      <button onclick="closeUserSearch()" class="btn-small">X</button>
+    </div>
+    <input type="text" id="user-search-input" placeholder="Ievadi lietotājvārdu..." oninput="handleUserSearch()" style="margin-top:12px; padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:var(--input-bg); color:var(--text-main); font-family:'Inter',sans-serif; flex-shrink:0;">
+    <div id="user-search-results" style="overflow-y:auto; flex:1; margin-top:10px; scrollbar-width:thin;">
+      <div style="opacity:0.4;font-size:0.85rem;padding:10px;">Raksti, lai meklētu...</div>
+    </div>
   </div>
 </div>
 
@@ -1243,20 +1275,44 @@ let inboxListener = null;
 
 function getDMConvId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
 
+let currentProfileUID = null;
+
 async function openProfile(uid, username) {
+  currentProfileUID = uid;
   document.getElementById('profile-modal').style.display = 'flex';
   document.getElementById('profile-username').innerText = username;
   document.getElementById('profile-badge').innerText = '';
   document.getElementById('profile-bio').innerText = '';
+  document.getElementById('profile-followers-num').innerText = '0';
+  document.getElementById('profile-following-num').innerText = '0';
   document.getElementById('profile-posts').innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Ielādē...</div>';
 
-  const dmWrap = document.getElementById('profile-dm-btn-wrap');
-  if (auth.currentUser && auth.currentUser.uid !== uid) {
-    dmWrap.style.display = 'block';
-    document.getElementById('profile-dm-btn').onclick = () => startDMWith(uid, username);
+  const isOwnProfile = auth.currentUser && auth.currentUser.uid === uid;
+
+  // Follow button
+  const followBtn = document.getElementById('profile-follow-btn');
+  const dmBtn = document.getElementById('profile-dm-btn-wrap');
+  if (auth.currentUser && !isOwnProfile) {
+    followBtn.style.display = 'block';
+    dmBtn.style.display = 'block';
+    // Check if already following
+    const followSnap = await database.ref(`followers/${uid}/${auth.currentUser.uid}`).once('value');
+    followBtn.innerText = followSnap.exists() ? 'Nesekot' : 'Sekot';
+    followBtn.style.background = followSnap.exists() ? 'var(--input-bg)' : 'var(--accent)';
+    followBtn.style.color = followSnap.exists() ? 'var(--text-main)' : 'white';
+    followBtn.style.border = followSnap.exists() ? '1px solid var(--border)' : 'none';
   } else {
-    dmWrap.style.display = 'none';
+    followBtn.style.display = 'none';
+    dmBtn.style.display = 'none';
   }
+
+  // Load follower/following counts
+  const [followersSnap, followingSnap] = await Promise.all([
+    database.ref(`followers/${uid}`).once('value'),
+    database.ref(`following/${uid}`).once('value')
+  ]);
+  document.getElementById('profile-followers-num').innerText = followersSnap.exists() ? Object.keys(followersSnap.val()).length : 0;
+  document.getElementById('profile-following-num').innerText = followingSnap.exists() ? Object.keys(followingSnap.val()).length : 0;
 
   const snap = await database.ref('users/' + uid).once('value');
   const u = snap.val();
@@ -1276,6 +1332,103 @@ async function openProfile(uid, username) {
     item.innerHTML = buildPostHTML(key, post, auth.currentUser && (auth.currentUser.uid === uid || userProfile?.role === 'admin'));
     postsContainer.appendChild(item);
   });
+}
+
+async function toggleFollow() {
+  if (!auth.currentUser || !currentProfileUID) return;
+  const myUID = auth.currentUser.uid;
+  const theirUID = currentProfileUID;
+  const followRef = database.ref(`followers/${theirUID}/${myUID}`);
+  const followingRef = database.ref(`following/${myUID}/${theirUID}`);
+  const snap = await followRef.once('value');
+  if (snap.exists()) {
+    await followRef.remove();
+    await followingRef.remove();
+  } else {
+    await followRef.set(true);
+    await followingRef.set(true);
+  }
+  // Refresh counts and button
+  const username = document.getElementById('profile-username').innerText;
+  openProfile(theirUID, username);
+}
+
+async function openFollowList(type) {
+  const uid = currentProfileUID;
+  if (!uid) return;
+  document.getElementById('follow-list-modal').style.display = 'flex';
+  document.getElementById('follow-list-title').innerText = type === 'followers' ? 'Sekotāji' : 'Seko';
+  const container = document.getElementById('follow-list-items');
+  container.innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Ielādē...</div>';
+
+  const snap = await database.ref(type === 'followers' ? `followers/${uid}` : `following/${uid}`).once('value');
+  const val = snap.val();
+  if (!val) { container.innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Nav.</div>'; return; }
+
+  container.innerHTML = '';
+  const uids = Object.keys(val);
+  for (const u of uids) {
+    const uSnap = await database.ref(`users/${u}`).once('value');
+    const uData = uSnap.val();
+    const name = uData?.username || 'Lietotājs';
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:10px; cursor:pointer; border-radius:12px; transition:0.15s;';
+    item.innerHTML = `<span style="font-weight:700;">${name}</span>${uData?.isPremium ? ' ✨' : ''}`;
+    item.onmouseover = () => item.style.background = 'var(--input-bg)';
+    item.onmouseout = () => item.style.background = '';
+    item.onclick = () => { closeFollowList(); openProfile(u, name); };
+    container.appendChild(item);
+  }
+}
+
+function closeFollowList() { document.getElementById('follow-list-modal').style.display = 'none'; }
+
+// --- USER SEARCH ---
+function openUserSearch() {
+  document.getElementById('user-search-modal').style.display = 'flex';
+  document.getElementById('user-search-input').value = '';
+  document.getElementById('user-search-results').innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Raksti, lai meklētu...</div>';
+  setTimeout(() => document.getElementById('user-search-input').focus(), 100);
+}
+
+function closeUserSearch() { document.getElementById('user-search-modal').style.display = 'none'; }
+
+async function handleUserSearch() {
+  const query = document.getElementById('user-search-input').value.trim().toLowerCase();
+  const results = document.getElementById('user-search-results');
+  if (query.length < 2) {
+    results.innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Raksti, lai meklētu...</div>';
+    return;
+  }
+  results.innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Meklē...</div>';
+  const snap = await database.ref('users').once('value');
+  const val = snap.val();
+  if (!val) { results.innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Nav rezultātu.</div>'; return; }
+  const matches = Object.entries(val)
+    .filter(([, u]) => u.username && u.username.toLowerCase().includes(query))
+    .slice(0, 10);
+  if (matches.length === 0) { results.innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Nav rezultātu.</div>'; return; }
+  results.innerHTML = '';
+  matches.forEach(([uid, u]) => {
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:10px 12px; cursor:pointer; border-radius:12px; transition:0.15s; display:flex; align-items:center; gap:10px;';
+    item.innerHTML = `
+      <div style="flex:1;">
+        <div style="font-weight:700;">${u.username}${u.isPremium ? ' ✨' : ''}</div>
+        ${u.bio ? `<div style="font-size:0.78rem;opacity:0.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">${u.bio}</div>` : ''}
+      </div>
+    `;
+    item.onmouseover = () => item.style.background = 'var(--input-bg)';
+    item.onmouseout = () => item.style.background = '';
+    item.onclick = () => { closeUserSearch(); openProfile(uid, u.username); };
+    results.appendChild(item);
+  });
+}
+
+function startDMFromProfile() {
+  if (!currentProfileUID) return;
+  const username = document.getElementById('profile-username').innerText;
+  startDMWith(currentProfileUID, username);
 }
 
 function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
