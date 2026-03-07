@@ -277,6 +277,25 @@
       font-size: 0.85rem;
       padding: 30px 0;
     }
+
+    /* Lightbox */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img {
+      max-width: 95vw;
+      max-height: 95vh;
+      border-radius: 12px;
+      object-fit: contain;
+    }
   </style>
 </head>
 <body>
@@ -370,6 +389,11 @@
     </div>
   </div>
   <button onclick="applyStatus()" class="btn-apply">Saglabāt</button>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="foto">
 </div>
 
 <!-- Feed FAB -->
@@ -754,6 +778,14 @@ async function deletePost(key) {
   }
 }
 
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('active');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('active');
+}
+
 function refreshFeed() {
   database.ref('feed').orderByChild('timestamp').once('value', (snapshot) => {
     const list = document.getElementById('feed-list');
@@ -774,7 +806,7 @@ function refreshFeed() {
           <span class="feed-item-time">${timeAgo(post.timestamp)}</span>
         </div>
         ${post.text ? `<div class="feed-item-text">${post.text}</div>` : ''}
-        ${post.photo ? `<img class="feed-item-img" src="${post.photo}" alt="foto">` : ''}
+        ${post.photo ? `<img class="feed-item-img" src="${post.photo}" alt="foto" onclick="openLightbox(this.src)" style="cursor:zoom-in;">` : ''}
         ${isOwner ? `<button class="feed-item-delete" onclick="deletePost('${key}')">Dzēst</button>` : ''}
       `;
       list.appendChild(item);
@@ -785,18 +817,14 @@ function refreshFeed() {
 
 database.ref('feed').orderByChild('timestamp').on('value', (snapshot) => {
   const list = document.getElementById('feed-list');
-  const empty = document.getElementById('feed-empty');
   const val = snapshot.val();
 
   if (!val) {
-    list.innerHTML = '';
-    list.appendChild(empty);
-    empty.style.display = 'block';
+    list.innerHTML = '<div class="feed-empty">Nav ziņu. Esi pirmais!</div>';
     return;
   }
 
-  const posts = Object.entries(val).reverse(); // newest first
-  empty.style.display = 'none';
+  const posts = Object.entries(val).reverse();
   list.innerHTML = '';
 
   posts.forEach(([key, post]) => {
@@ -809,7 +837,7 @@ database.ref('feed').orderByChild('timestamp').on('value', (snapshot) => {
         <span class="feed-item-time">${timeAgo(post.timestamp)}</span>
       </div>
       ${post.text ? `<div class="feed-item-text">${post.text}</div>` : ''}
-      ${post.photo ? `<img class="feed-item-img" src="${post.photo}" alt="foto">` : ''}
+      ${post.photo ? `<img class="feed-item-img" src="${post.photo}" alt="foto" onclick="openLightbox(this.src)" style="cursor:zoom-in;">` : ''}
       ${isOwner ? `<button class="feed-item-delete" onclick="deletePost('${key}')">Dzēst</button>` : ''}
     `;
     list.appendChild(item);
