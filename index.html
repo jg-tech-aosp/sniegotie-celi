@@ -458,6 +458,17 @@
       <h2 style="margin:0;">Lietotāju Kontrole</h2>
       <button onclick="closeAdminDashboard()" class="auth-btn">X</button>
     </div>
+
+    <!-- Pinned Announcement -->
+    <div style="margin-top:15px; padding:12px; background:var(--input-bg); border-radius:14px; border:1px solid var(--border);">
+      <div style="font-weight:700; font-size:0.8rem; margin-bottom:8px;">📌 Piesprausts paziņojums</div>
+      <textarea id="pin-text" rows="2" placeholder="Raksti paziņojumu..." style="width:100%; padding:8px 10px; border-radius:10px; border:1px solid var(--border); background:var(--bg-panel); color:var(--text-main); font-family:'Inter',sans-serif; font-size:0.85rem; resize:none; box-sizing:border-box;"></textarea>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn-apply" style="margin-top:0; padding:10px;" onclick="pinAnnouncement()">Piespraust</button>
+        <button class="btn-apply" style="margin-top:0; padding:10px; background:#FF3B30;" onclick="unpinAnnouncement()">Noņemt</button>
+      </div>
+    </div>
+
     <input type="text" id="adminSearch" placeholder="Meklēt lietotāju..." oninput="renderUserList()" style="margin-top:15px;">
     <div id="user-list" class="user-list"></div>
     <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top:15px;">
@@ -499,7 +510,7 @@
     </div>
   </div>
   <div class="feed-compose" id="feed-compose">
-    <textarea id="feed-text" rows="3" placeholder="Ko jauns Rēzeknē?"></textarea>
+    <textarea id="feed-text" rows="3" placeholder="Kas jauns Rēzeknē?"></textarea>
     <div class="feed-compose-actions">
       <label class="feed-photo-label" title="Pievienot foto">
         📷
@@ -508,6 +519,10 @@
       <img id="feed-photo-preview" class="feed-photo-preview" alt="preview">
       <button class="feed-post-btn" onclick="submitPost()">Publicēt</button>
     </div>
+  </div>
+  <div id="pinned-announcement" style="display:none; flex-shrink:0; margin:0 12px 10px; padding:12px; background:rgba(0,122,255,0.1); border:1px solid var(--accent); border-radius:14px; font-size:0.85rem;">
+    <div style="font-weight:700; margin-bottom:4px;">📌 Paziņojums</div>
+    <div id="pinned-text"></div>
   </div>
   <div class="feed-list" id="feed-list">
     <div class="feed-empty" id="feed-empty">Nav ziņu. Esi pirmais!</div>
@@ -612,7 +627,7 @@ async function deleteOwnAccount() {
       await database.ref('users/' + user.uid).remove();
       await user.delete();
       location.reload();
-    } catch (e) { alert("Lūdzu, izlogojieties un ielogojieties vēlreiz."); }
+    } catch (e) { alert("Lūdzu, izejiet un pierakstaties vēlreiz."); }
   }
 }
 
@@ -632,9 +647,12 @@ function renderUserList() {
     if (u.username?.toLowerCase().includes(search)) {
       const row = document.createElement('div');
       row.className = 'user-row';
-      row.innerHTML = `<div style="font-weight:700;">${u.username} (${u.dob})</div>
-        <div class="user-controls" style="display:flex; gap:8px; margin-top:10px;">
+      row.innerHTML = `
+        <div style="font-weight:700;">${u.username} (${u.dob || '—'})</div>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">
           <button class="btn-small" style="background:${u.isPremium ? '#34C759' : '#8E8E93'}; color:white;" onclick="updateAdminUser('${uid}', {isPremium: ${!u.isPremium}})">${u.isPremium ? 'Noņemt Premium' : 'Dot Premium'}</button>
+          <button class="btn-small" style="background:${u.bannedDraw ? '#FF9500' : '#8E8E93'}; color:white;" onclick="updateAdminUser('${uid}', {bannedDraw: ${!u.bannedDraw}})">${u.bannedDraw ? '✓ Aizl. zīmēt' : 'Aizliegt zīmēt'}</button>
+          <button class="btn-small" style="background:${u.bannedPost ? '#FF9500' : '#8E8E93'}; color:white;" onclick="updateAdminUser('${uid}', {bannedPost: ${!u.bannedPost}})">${u.bannedPost ? '✓ Aizl. rakstīt' : 'Aizliegt rakstīt'}</button>
           <button class="btn-small" style="background:#FF3B30; color:white;" onclick="deleteAdminUser('${uid}')">Dzēst</button>
         </div>`;
       list.appendChild(row);
@@ -644,6 +662,35 @@ function renderUserList() {
 async function updateAdminUser(uid, data) { await database.ref('users/' + uid).update(data); openAdminDashboard(); }
 async function deleteAdminUser(uid) { if (confirm("Dzēst?")) { await database.ref('users/' + uid).remove(); openAdminDashboard(); } }
 function resetMap() { if (confirm("Atiestatīt VISU karti?")) database.ref('streets').remove(); }
+
+// --- PINNED ANNOUNCEMENT ---
+async function pinAnnouncement() {
+  const text = document.getElementById('pin-text').value.trim();
+  if (!text) return;
+  await database.ref('pinned').set({ text, timestamp: Date.now() });
+  alert('Paziņojums piesprausts!');
+}
+async function unpinAnnouncement() {
+  await database.ref('pinned').remove();
+  alert('Paziņojums noņemts.');
+}
+
+// Listen for pinned announcement
+database.ref('pinned').on('value', (snap) => {
+  const el = document.getElementById('pinned-announcement');
+  const textEl = document.getElementById('pinned-text');
+  if (!el || !textEl) return;
+  const val = snap.val();
+  if (val && val.text) {
+    textEl.innerText = val.text;
+    el.style.display = 'block';
+    // Pre-fill admin textarea if open
+    const pinInput = document.getElementById('pin-text');
+    if (pinInput) pinInput.value = val.text;
+  } else {
+    el.style.display = 'none';
+  }
+});
 
 // --- MAP & SEARCH ---
 const map = L.map('map', { zoomControl: false, attributionControl: false, minZoom: 10 }).setView([56.5100, 27.3400], 14);
@@ -755,6 +802,10 @@ function applyStatus() {
     if (guestEdits >= 2) { alert("Piesakieties!"); return openAuth('login'); }
     guestEdits++; localStorage.setItem('guest_edits', guestEdits);
   }
+  if (userProfile?.bannedDraw) {
+    alert("⛔ Jums ir aizliegts atzīmēt ielas.");
+    return;
+  }
   const id = selectedLayer.feature.properties.id;
   database.ref('streets/' + id).set({
     cars: document.getElementById("carsCheck").checked,
@@ -838,6 +889,10 @@ async function submitPost() {
   const text = document.getElementById('feed-text').value.trim();
   if (!text && !feedPhotoBase64) return;
   if (!auth.currentUser) return;
+  if (userProfile?.bannedPost) {
+    alert("⛔ Jums ir aizliegts publicēt ziņas.");
+    return;
+  }
 
   const post = {
     uid: auth.currentUser.uid,
@@ -917,6 +972,10 @@ function loadComments(postId) {
 
 async function submitComment(postId) {
   if (!auth.currentUser) return openAuth('login');
+  if (userProfile?.bannedPost) {
+    alert("⛔ Jums ir aizliegts publicēt ziņas.");
+    return;
+  }
   const input = document.getElementById(`comment-input-${postId}`);
   const text = input.value.trim();
   if (!text) return;
