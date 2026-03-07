@@ -38,11 +38,19 @@
     .auth-nav { position: absolute; top: 20px; left: 20px; z-index: 1000; display: flex; gap: 10px; }
     .auth-btn { background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border); padding: 10px 16px; border-radius: 12px; cursor: pointer; font-weight: 600; backdrop-filter: blur(10px); box-shadow: var(--shadow); transition: 0.2s; }
     
-    /* Make user tag look clickable when logged in */
     #user-tag:not([disabled]) { border-color: var(--accent); cursor: pointer; }
     #user-tag:not([disabled]):hover { background: var(--input-bg); }
 
     .theme-toggle { position: absolute; top: 20px; right: 20px; z-index: 1000; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px; width: 44px; height: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); font-size: 1.2rem; }
+
+    /* Search & Location Controls */
+    .map-controls { position: absolute; top: 80px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+    .search-box { position: relative; width: 250px; }
+    #streetSearch { width: 100%; padding: 12px 15px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-main); backdrop-filter: blur(10px); box-shadow: var(--shadow); box-sizing: border-box; }
+    .search-results { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-panel); border-radius: 12px; margin-top: 5px; max-height: 200px; overflow-y: auto; display: none; box-shadow: var(--shadow); z-index: 1001; }
+    .search-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 0.9rem; color: var(--text-main); }
+    .search-item:hover { background: var(--input-bg); }
+    .control-btn { width: 44px; height: 44px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; backdrop-filter: blur(10px); }
 
     /* Modals */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
@@ -80,6 +88,14 @@
   </div>
 </div>
 
+<div class="map-controls">
+  <div class="search-box">
+    <input type="text" id="streetSearch" placeholder="Meklēt ielu Rēzeknē..." oninput="handleSearch()">
+    <div id="search-results" class="search-results"></div>
+  </div>
+  <button class="control-btn" onclick="findMyLocation()" title="Mana atrašanās vieta">📍</button>
+</div>
+
 <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
 <div id="map"></div>
 
@@ -103,17 +119,13 @@
       <h2 style="margin:0;">Iestatījumi</h2>
       <button onclick="closeSettings()" class="btn-small">X</button>
     </div>
-    
     <span class="label-hint">Lietotājvārds</span>
     <input type="text" id="settings-username">
-    
     <span class="label-hint">Dzimšanas datums</span>
     <input type="date" id="settings-dob">
-
     <div id="settings-stats" style="margin:15px 0; padding:12px; background:var(--input-bg); border-radius:12px; font-size:0.9rem;">
       Statuss: <span id="settings-premium-badge">Parasts</span>
     </div>
-
     <button class="btn-apply" onclick="updateUserSettings()">Saglabāt izmaiņas</button>
     <button class="btn-danger" onclick="deleteOwnAccount()">Dzēst manu kontu</button>
   </div>
@@ -166,6 +178,7 @@ const auth = firebase.auth();
 
 let userProfile = null;
 let allUsers = {};
+let allStreetData = [];
 let guestEdits = parseInt(localStorage.getItem('guest_edits')) || 0;
 let isPedestrianUnlocked = false;
 let streetStates = {};
@@ -180,11 +193,9 @@ auth.onAuthStateChanged(async (user) => {
     userProfile = snapshot.val();
     document.getElementById('logged-out-ui').style.display = 'none';
     document.getElementById('logged-in-ui').style.display = 'block';
-    
     const tag = document.getElementById('user-tag');
     tag.innerText = userProfile?.username || "Lietotājs";
     tag.disabled = false;
-
     if (userProfile?.role === 'admin') document.getElementById('admin-panel-btn').style.display = 'block';
     if (userProfile?.isPremium) unlockPedestrianFeature();
   } else {
@@ -193,7 +204,7 @@ auth.onAuthStateChanged(async (user) => {
   }
 });
 
-// --- SETTINGS LOGIC ---
+// --- SETTINGS ---
 function openSettings() {
   if (!userProfile) return;
   document.getElementById('settings-modal').style.display = 'flex';
@@ -201,20 +212,16 @@ function openSettings() {
   document.getElementById('settings-dob').value = userProfile.dob || "";
   document.getElementById('settings-premium-badge').innerText = userProfile.isPremium ? "Premium ✨" : "Bezmaksas";
 }
-
 function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
-
 async function updateUserSettings() {
   try {
     await database.ref('users/' + auth.currentUser.uid).update({
       username: document.getElementById('settings-username').value,
       dob: document.getElementById('settings-dob').value
     });
-    alert("Saglabāts!");
-    location.reload();
+    alert("Saglabāts!"); location.reload();
   } catch (e) { alert(e.message); }
 }
-
 async function deleteOwnAccount() {
   if (confirm("VAI TIEŠĀM dzēst savu kontu? Šī darbība ir neatgriezeniska.")) {
     const user = auth.currentUser;
@@ -222,35 +229,17 @@ async function deleteOwnAccount() {
       await database.ref('users/' + user.uid).remove();
       await user.delete();
       location.reload();
-    } catch (e) { alert("Lūdzu, izlogojieties un ielogojieties vēlreiz, lai apstiprinātu dzēšanu."); }
+    } catch (e) { alert("Lūdzu, izlogojieties un ielogojieties vēlreiz."); }
   }
 }
 
-// --- REST OF APP LOGIC ---
-async function submitAuth() {
-  const email = document.getElementById('email').value;
-  const pass = document.getElementById('password').value;
-  const isReg = document.getElementById('reg-fields').style.display === 'block';
-  try {
-    if (isReg) {
-      const res = await auth.createUserWithEmailAndPassword(email, pass);
-      await database.ref('users/' + res.user.uid).set({
-        username: document.getElementById('username').value,
-        dob: document.getElementById('dob').value,
-        role: 'user', isPremium: false
-      });
-    } else { await auth.signInWithEmailAndPassword(email, pass); }
-    closeAuth();
-  } catch (e) { alert(e.message); }
-}
-
+// --- ADMIN ---
 async function openAdminDashboard() {
   document.getElementById('admin-dashboard').style.display = 'flex';
   const snapshot = await database.ref('users').once('value');
   allUsers = snapshot.val() || {};
   renderUserList();
 }
-
 function renderUserList() {
   const list = document.getElementById('user-list');
   const search = document.getElementById('adminSearch').value.toLowerCase();
@@ -260,30 +249,25 @@ function renderUserList() {
     if (u.username?.toLowerCase().includes(search)) {
       const row = document.createElement('div');
       row.className = 'user-row';
-      row.innerHTML = `
-        <div style="font-weight:700;">${u.username} <span style="font-weight:400; opacity:0.6; font-size:0.8rem;">(${u.dob})</span></div>
+      row.innerHTML = `<div style="font-weight:700;">${u.username} (${u.dob})</div>
         <div class="user-controls" style="display:flex; gap:8px; margin-top:10px;">
-          <button class="btn-small" style="background:${u.isPremium ? '#34C759' : '#8E8E93'}; color:white;" onclick="updateAdminUser('${uid}', {isPremium: ${!u.isPremium}})">
-            ${u.isPremium ? 'Noņemt Premium' : 'Dot Premium'}
-          </button>
+          <button class="btn-small" style="background:${u.isPremium ? '#34C759' : '#8E8E93'}; color:white;" onclick="updateAdminUser('${uid}', {isPremium: ${!u.isPremium}})">${u.isPremium ? 'Noņemt Premium' : 'Dot Premium'}</button>
           <button class="btn-small" style="background:#FF3B30; color:white;" onclick="deleteAdminUser('${uid}')">Dzēst</button>
         </div>`;
       list.appendChild(row);
     }
   }
 }
-
 async function updateAdminUser(uid, data) { await database.ref('users/' + uid).update(data); openAdminDashboard(); }
-async function deleteAdminUser(uid) { if (confirm("Dzēst lietotāju?")) { await database.ref('users/' + uid).remove(); openAdminDashboard(); } }
-function resetMap() { if (confirm("Atiestatīt VISUS ielu datus?")) database.ref('streets').remove(); }
+async function deleteAdminUser(uid) { if (confirm("Dzēst?")) { await database.ref('users/' + uid).remove(); openAdminDashboard(); } }
+function resetMap() { if (confirm("Atiestatīt VISU karti?")) database.ref('streets').remove(); }
 
-// Map Init
+// --- MAP & SEARCH ---
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([56.5100, 27.3400], 14);
 const tileLayers = {
   light: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'),
   dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png')
 };
-
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   Object.values(tileLayers).forEach(l => map.removeLayer(l));
@@ -314,9 +298,11 @@ async function loadStreets() {
   try {
     const res = await fetch("https://overpass-api.de/api/interpreter", { method: "POST", body: query });
     const data = await res.json();
+    allStreetData = data.elements.filter(el => el.tags && el.tags.name);
+    
     L.geoJSON(data.elements.map(el => ({
       type: "Feature", geometry: { type: "LineString", coordinates: el.geometry.map(g => [g.lon, g.lat]) },
-      properties: { id: el.id }
+      properties: { id: el.id, name: el.tags?.name || "Nezināma iela" }
     })), {
       style: f => ({ color: getColor(streetStates[f.properties.id]), weight: 6, opacity: 0.8, lineCap: 'round' }),
       onEachFeature: (f, layer) => {
@@ -336,9 +322,39 @@ async function loadStreets() {
   } catch (e) { console.error(e); }
 }
 
+function handleSearch() {
+  const query = document.getElementById('streetSearch').value.toLowerCase();
+  const resDiv = document.getElementById('search-results');
+  if (query.length < 2) { resDiv.style.display = 'none'; return; }
+  const matches = allStreetData.filter(s => s.tags.name.toLowerCase().includes(query)).slice(0, 5);
+  if (matches.length > 0) {
+    resDiv.innerHTML = matches.map(m => `<div class="search-item" onclick="focusStreet('${m.id}')">${m.tags.name}</div>`).join('');
+    resDiv.style.display = 'block';
+  } else { resDiv.style.display = 'none'; }
+}
+
+function focusStreet(id) {
+  const layer = streetLayersById[id];
+  if (layer) {
+    map.fitBounds(layer.getBounds(), { maxZoom: 18 });
+    layer.fire('click');
+    document.getElementById('search-results').style.display = 'none';
+    document.getElementById('streetSearch').value = "";
+  }
+}
+
+function findMyLocation() {
+  if (!navigator.geolocation) return alert("Nav pieejams.");
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    map.setView([lat, lng], 17);
+    L.circle([lat, lng], { radius: 10, color: '#007AFF' }).addTo(map).bindPopup("Tu esi šeit").openPopup();
+  }, () => alert("Atļauja liegta."));
+}
+
 function applyStatus() {
   if (!auth.currentUser) {
-    if (guestEdits >= 2) { alert("Lūdzu pieteikties!"); return openAuth('login'); }
+    if (guestEdits >= 2) { alert("Piesakieties!"); return openAuth('login'); }
     guestEdits++; localStorage.setItem('guest_edits', guestEdits);
   }
   const id = selectedLayer.feature.properties.id;
@@ -365,6 +381,17 @@ paypal.Buttons({
 }).render('#paypal-button-container');
 
 function openAuth(m) { document.getElementById('auth-modal').style.display='flex'; document.getElementById('modal-title').innerText=m==='login'?'Pieteikties':'Reģistrēties'; document.getElementById('reg-fields').style.display=m==='login'?'none':'block'; }
+async function submitAuth() {
+  const email = document.getElementById('email').value, pass = document.getElementById('password').value;
+  const isReg = document.getElementById('reg-fields').style.display === 'block';
+  try {
+    if (isReg) {
+      const res = await auth.createUserWithEmailAndPassword(email, pass);
+      await database.ref('users/' + res.user.uid).set({ username: document.getElementById('username').value, dob: document.getElementById('dob').value, role: 'user', isPremium: false });
+    } else { await auth.signInWithEmailAndPassword(email, pass); }
+    closeAuth();
+  } catch (e) { alert(e.message); }
+}
 function closeAuth() { document.getElementById('auth-modal').style.display='none'; }
 function closeAdminDashboard() { document.getElementById('admin-dashboard').style.display='none'; }
 function toggleTheme() { setTheme(currentTheme === 'light' ? 'dark' : 'light'); }
