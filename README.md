@@ -1,2 +1,2 @@
-# dievs-sveti-rezekni
-sniegs un cits
+# DSR (Dievs, svētī Rēzekni)
+Projekts "Sniegotie ceļi" ir domāts kā mēģinājums palīdzēt Rēzeknes iedzīvotājiem ziņot par netīrītiem ceļiem un gājēju celiņiem.
