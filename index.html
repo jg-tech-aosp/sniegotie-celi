@@ -79,7 +79,6 @@
       color: var(--text-main);
       display: flex;
       flex-direction: column;
-      /* FIX: constrain height so panel never grows beyond viewport */
       max-height: min(85vh, 520px);
     }
     @media (min-width: 601px) {
@@ -89,11 +88,9 @@
       .control-panel { bottom: 20px; left: 5%; right: 5%; width: 90%; border-radius: 28px; padding: 20px; box-sizing: border-box; }
     }
 
-    /* FIX: make the scrollable content area inside the panel */
     .panel-content {
       overflow-y: auto;
       flex: 1;
-      /* Custom scrollbar */
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
@@ -102,17 +99,14 @@
     .panel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
     .option-card { display: flex; align-items: center; padding: 14px; margin: 6px 0; background: var(--input-bg); border-radius: 16px; }
-    .btn-apply { background: var(--accent); color: white; border: none; padding: 16px; border-radius: 16px; width: 100%; font-weight: 700; cursor: pointer; margin-top: 10px; /* FIX: don't shrink the save button */ flex-shrink: 0; }
+    .btn-apply { background: var(--accent); color: white; border: none; padding: 16px; border-radius: 16px; width: 100%; font-weight: 700; cursor: pointer; margin-top: 10px; flex-shrink: 0; }
     .btn-danger { background: none; border: none; color: #FF3B30; cursor: pointer; font-size: 0.8rem; text-decoration: underline; width: 100%; margin-top: 20px; }
 
-    /* FIX: constrain PayPal container so it doesn't blow up the panel */
     #paypal-button-container {
       max-height: 200px;
       overflow-y: auto;
       overflow-x: hidden;
     }
-
-    /* FIX: PayPal iframes inside the container should not overflow */
     #paypal-button-container iframe {
       max-width: 100% !important;
     }
@@ -545,7 +539,6 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const auth = firebase.auth();
 
-// Define Google Provider
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 
 let userProfile = null;
@@ -578,13 +571,10 @@ auth.onAuthStateChanged(async (user) => {
   }
 });
 
-// --- GOOGLE LOGIN FUNCTION ---
 async function signInWithGoogle() {
   try {
     const result = await auth.signInWithPopup(googleProvider);
     const user = result.user;
-    
-    // Check if user exists in RTDB, if not, create profile
     const snapshot = await database.ref('users/' + user.uid).once('value');
     if (!snapshot.exists()) {
       await database.ref('users/' + user.uid).set({
@@ -675,7 +665,6 @@ async function unpinAnnouncement() {
   alert('Paziņojums noņemts.');
 }
 
-// Listen for pinned announcement
 database.ref('pinned').on('value', (snap) => {
   const el = document.getElementById('pinned-announcement');
   const textEl = document.getElementById('pinned-text');
@@ -684,7 +673,6 @@ database.ref('pinned').on('value', (snap) => {
   if (val && val.text) {
     textEl.innerText = val.text;
     el.style.display = 'block';
-    // Pre-fill admin textarea if open
     const pinInput = document.getElementById('pin-text');
     if (pinInput) pinInput.value = val.text;
   } else {
@@ -708,12 +696,13 @@ function setTheme(theme) {
 }
 setTheme(currentTheme);
 
+// FIX: return grey when street is clean (both flags false), not blue
 function getColor(state) {
   if (!state) return "#94a3b8";
   if (state.cars && state.ped) return "#ef4444";
   if (state.cars) return "#f59e0b";
   if (state.ped) return "#8b5cf6";
-  return "#3b82f6";
+  return "#94a3b8";
 }
 
 database.ref('streets').on('value', (snapshot) => {
@@ -727,7 +716,6 @@ async function retryLoadStreets() {
   const btn = document.getElementById('reload-streets-btn');
   btn.innerText = '⏳';
   btn.style.pointerEvents = 'none';
-  // Clear existing layers
   for (let id in streetLayersById) {
     map.removeLayer(streetLayersById[id]);
   }
@@ -845,6 +833,7 @@ function closeAuth() { document.getElementById('auth-modal').style.display='none
 function closeAdminDashboard() { document.getElementById('admin-dashboard').style.display='none'; }
 function toggleTheme() { setTheme(currentTheme === 'light' ? 'dark' : 'light'); }
 function handleLogout() { auth.signOut().then(() => location.reload()); }
+
 // --- BLOG FEED ---
 let feedPhotoBase64 = null;
 let isFeedOpen = false;
@@ -863,7 +852,6 @@ function updateComposeVisibility() {
 function handlePhotoSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
-  // Resize/compress before storing as base64
   const reader = new FileReader();
   reader.onload = (e) => {
     const img = new Image();
@@ -893,7 +881,6 @@ async function submitPost() {
     alert("⛔ Jums ir aizliegts publicēt ziņas.");
     return;
   }
-
   const post = {
     uid: auth.currentUser.uid,
     username: userProfile?.username || auth.currentUser.displayName || 'Lietotājs',
@@ -901,10 +888,7 @@ async function submitPost() {
     photo: feedPhotoBase64 || null,
     timestamp: Date.now()
   };
-
   await database.ref('feed').push(post);
-
-  // Reset compose
   document.getElementById('feed-text').value = '';
   document.getElementById('feed-photo-preview').style.display = 'none';
   document.getElementById('feed-photo-input').value = '';
@@ -1030,7 +1014,6 @@ async function openProfile(uid, username) {
   document.getElementById('profile-bio').innerText = '';
   document.getElementById('profile-posts').innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Ielādē...</div>';
 
-  // Load user data
   const snap = await database.ref('users/' + uid).once('value');
   const u = snap.val();
   if (u) {
@@ -1038,7 +1021,6 @@ async function openProfile(uid, username) {
     document.getElementById('profile-bio').innerText = u.bio || 'Nav bio.';
   }
 
-  // Load their posts
   const feedSnap = await database.ref('feed').orderByChild('uid').equalTo(uid).once('value');
   const postsContainer = document.getElementById('profile-posts');
   postsContainer.innerHTML = '';
@@ -1085,7 +1067,6 @@ function refreshFeed() {
     });
   });
 }
-
 
 database.ref('feed').orderByChild('timestamp').on('value', (snapshot) => {
   const list = document.getElementById('feed-list');
