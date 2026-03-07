@@ -483,6 +483,11 @@
         <div id="paypal-button-container"></div>
       </div>
     </div>
+    <!-- Street history — admin only -->
+    <div id="street-history-section" style="display:none; margin-top:15px; border-top:1px solid var(--border); padding-top:15px;">
+      <div style="font-weight:700; font-size:0.8rem; opacity:0.5; margin-bottom:8px;">📋 IZMAIŅU VĒSTURE</div>
+      <div id="street-history-list"></div>
+    </div>
   </div>
   <button onclick="applyStatus()" class="btn-apply">Saglabāt</button>
 </div>
@@ -511,7 +516,7 @@
         📷
         <input type="file" id="feed-photo-input" accept="image/*" style="display:none;" onchange="handlePhotoSelect(event)">
       </label>
-      <img id="feed-photo-preview" class="feed-photo-preview" alt="preview">
+      <div id="feed-photo-previews" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
       <button class="feed-post-btn" onclick="submitPost()">Publicēt</button>
     </div>
   </div>
@@ -750,6 +755,14 @@ async function loadStreets() {
           document.getElementById("carsCheck").checked = state.cars;
           if (isPedestrianUnlocked) document.getElementById("pedCheck").checked = state.ped;
           document.getElementById("panel").style.display = "flex";
+          // Show history section for admins
+          const historySection = document.getElementById('street-history-section');
+          if (userProfile?.role === 'admin') {
+            historySection.style.display = 'block';
+            loadStreetHistory(id);
+          } else {
+            historySection.style.display = 'none';
+          }
         });
       }
     }).addTo(map);
@@ -796,11 +809,42 @@ function applyStatus() {
     return;
   }
   const id = selectedLayer.feature.properties.id;
-  database.ref('streets/' + id).set({
-    cars: document.getElementById("carsCheck").checked,
-    ped: isPedestrianUnlocked ? document.getElementById("pedCheck").checked : (streetStates[id]?.ped || false)
-  });
+  const cars = document.getElementById("carsCheck").checked;
+  const ped = isPedestrianUnlocked ? document.getElementById("pedCheck").checked : (streetStates[id]?.ped || false);
+
+  database.ref('streets/' + id).set({ cars, ped });
+
+  // Log history entry
+  const historyEntry = {
+    uid: auth.currentUser?.uid || 'guest',
+    username: userProfile?.username || auth.currentUser?.displayName || 'Viesis',
+    cars,
+    ped,
+    timestamp: Date.now()
+  };
+  database.ref(`street_history/${id}`).push(historyEntry);
+
   document.getElementById("panel").style.display = "none";
+}
+
+async function loadStreetHistory(streetId) {
+  const list = document.getElementById('street-history-list');
+  list.innerHTML = '<div style="opacity:0.4;font-size:0.8rem;">Ielādē...</div>';
+  const snap = await database.ref(`street_history/${streetId}`).orderByChild('timestamp').limitToLast(10).once('value');
+  const val = snap.val();
+  if (!val) {
+    list.innerHTML = '<div style="opacity:0.4;font-size:0.8rem;">Nav vēstures.</div>';
+    return;
+  }
+  const entries = Object.values(val).reverse();
+  list.innerHTML = entries.map(e => {
+    const flags = [e.cars ? '🚗' : '', e.ped ? '🚶' : ''].filter(Boolean).join(' ') || '✅ Tīrs';
+    return `<div style="padding:6px 0; border-bottom:1px solid var(--border); font-size:0.8rem;">
+      <span style="font-weight:700;">${e.username}</span>
+      <span style="opacity:0.5; margin-left:6px;">${timeAgo(e.timestamp)}</span>
+      <div style="margin-top:2px;">${flags}</div>
+    </div>`;
+  }).join('');
 }
 
 function unlockPedestrianFeature() {
@@ -836,7 +880,7 @@ function toggleTheme() { setTheme(currentTheme === 'light' ? 'dark' : 'light'); 
 function handleLogout() { auth.signOut().then(() => location.reload()); }
 
 // --- BLOG FEED ---
-let feedPhotoBase64 = null;
+let feedPhotos = []; // array of base64 strings
 let isFeedOpen = false;
 
 function toggleFeed() {
@@ -860,6 +904,11 @@ function updateComposeVisibility() {
 function handlePhotoSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
+  const maxPhotos = userProfile?.isPremium ? 3 : 1;
+  if (feedPhotos.length >= maxPhotos) {
+    alert(userProfile?.isPremium ? 'Maksimums 3 bildes.' : 'Bezmaksas lietotāji var pievienot 1 bildi. Iegādājieties Premium, lai pievienotu līdz 3!');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
     const img = new Image();
@@ -871,19 +920,38 @@ function handlePhotoSelect(event) {
       if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      feedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.7);
-      const preview = document.getElementById('feed-photo-preview');
-      preview.src = feedPhotoBase64;
-      preview.style.display = 'block';
+      const base64 = canvas.toDataURL('image/jpeg', 0.7);
+      feedPhotos.push(base64);
+      renderPhotoPreviews();
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function renderPhotoPreviews() {
+  const container = document.getElementById('feed-photo-previews');
+  container.innerHTML = '';
+  feedPhotos.forEach((src, i) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative; display:inline-block;';
+    wrap.innerHTML = `
+      <img src="${src}" style="width:48px; height:48px; object-fit:cover; border-radius:8px; display:block;">
+      <button onclick="removePhoto(${i})" style="position:absolute;top:-4px;right:-4px;background:#FF3B30;color:white;border:none;border-radius:50%;width:16px;height:16px;font-size:0.6rem;cursor:pointer;line-height:16px;padding:0;">✕</button>
+    `;
+    container.appendChild(wrap);
+  });
+}
+
+function removePhoto(index) {
+  feedPhotos.splice(index, 1);
+  renderPhotoPreviews();
 }
 
 async function submitPost() {
   const text = document.getElementById('feed-text').value.trim();
-  if (!text && !feedPhotoBase64) return;
+  if (!text && feedPhotos.length === 0) return;
   if (!auth.currentUser) return;
   if (userProfile?.bannedPost) {
     alert("⛔ Jums ir aizliegts publicēt ziņas.");
@@ -892,15 +960,16 @@ async function submitPost() {
   const post = {
     uid: auth.currentUser.uid,
     username: userProfile?.username || auth.currentUser.displayName || 'Lietotājs',
+    isPremium: userProfile?.isPremium || false,
     text: text,
-    photo: feedPhotoBase64 || null,
+    photos: feedPhotos.length > 0 ? feedPhotos : null,
     timestamp: Date.now()
   };
   await database.ref('feed').push(post);
   document.getElementById('feed-text').value = '';
-  document.getElementById('feed-photo-preview').style.display = 'none';
+  document.getElementById('feed-photo-previews').innerHTML = '';
   document.getElementById('feed-photo-input').value = '';
-  feedPhotoBase64 = null;
+  feedPhotos = [];
 }
 
 function timeAgo(ts) {
@@ -947,11 +1016,12 @@ function loadComments(postId) {
     if (!val) { container.innerHTML = '<div style="opacity:0.4;font-size:0.8rem;padding:4px 0;">Nav komentāru.</div>'; return; }
     Object.entries(val).forEach(([cid, c]) => {
       const canDelete = auth.currentUser && (auth.currentUser.uid === c.uid || userProfile?.role === 'admin');
+      const badge = c.isPremium ? ' ✨' : '';
       const div = document.createElement('div');
       div.className = 'comment-item';
       div.innerHTML = `
         <div style="flex:1;">
-          <span class="comment-author" onclick="openProfile('${c.uid}','${c.username}')">${c.username}</span>
+          <span class="comment-author" onclick="openProfile('${c.uid}','${c.username}')">${c.username}${badge}</span>
           <span class="comment-meta"> · ${timeAgo(c.timestamp)}</span>
           <div class="comment-text">${c.text}</div>
         </div>
@@ -974,6 +1044,7 @@ async function submitComment(postId) {
   await database.ref(`feed/${postId}/comments`).push({
     uid: auth.currentUser.uid,
     username: userProfile?.username || auth.currentUser.displayName || 'Lietotājs',
+    isPremium: userProfile?.isPremium || false,
     text,
     timestamp: Date.now()
   });
@@ -988,13 +1059,19 @@ function buildPostHTML(key, post, isOwner) {
   const likes = post.likes ? Object.keys(post.likes).length : 0;
   const comments = post.comments ? Object.keys(post.comments).length : 0;
   const isLiked = auth.currentUser && post.likes && post.likes[auth.currentUser.uid];
+  const badge = post.isPremium ? ' ✨' : '';
+
+  // Support both old single photo and new multi-photo
+  const photos = post.photos ? Object.values(post.photos) : (post.photo ? [post.photo] : []);
+  const photosHTML = photos.map(src => `<img class="feed-item-img" src="${src}" alt="foto" onclick="openLightbox(this.src)" style="cursor:zoom-in;">`).join('');
+
   return `
     <div class="feed-item-header">
-      <span class="feed-item-user" onclick="openProfile('${post.uid}', '${post.username}')">${post.username}</span>
+      <span class="feed-item-user" onclick="openProfile('${post.uid}', '${post.username}')">${post.username}${badge}</span>
       <span class="feed-item-time">${timeAgo(post.timestamp)}</span>
     </div>
     ${post.text ? `<div class="feed-item-text">${post.text}</div>` : ''}
-    ${post.photo ? `<img class="feed-item-img" src="${post.photo}" alt="foto" onclick="openLightbox(this.src)" style="cursor:zoom-in;">` : ''}
+    ${photosHTML}
     <div class="feed-item-actions">
       <button class="action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLike('${key}', this)">
         ❤️ <span>${likes}</span>
