@@ -431,6 +431,35 @@
       font-size: 0.8rem;
     }
 
+    /* --- PROFILE PICTURES --- */
+    .user-avatar {
+      width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+      background: var(--accent); display: inline-flex; align-items: center;
+      justify-content: center; font-weight: 700; color: white; font-size: 0.9rem;
+      flex-shrink: 0; vertical-align: middle;
+    }
+    .user-avatar-lg {
+      width: 64px; height: 64px; border-radius: 50%; object-fit: cover;
+      background: var(--accent); display: flex; align-items: center;
+      justify-content: center; font-weight: 700; color: white; font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .user-avatar-sm {
+      width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+      background: var(--accent); display: inline-flex; align-items: center;
+      justify-content: center; font-weight: 700; color: white; font-size: 0.7rem;
+      flex-shrink: 0; vertical-align: middle;
+    }
+    .pfp-upload-wrap {
+      display: flex; align-items: center; gap: 14px; margin: 14px 0;
+      padding: 12px; background: var(--input-bg); border-radius: 14px; border: 1px solid var(--border);
+    }
+    .pfp-upload-btn {
+      background: var(--accent); color: white; border: none; border-radius: 10px;
+      padding: 7px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    }
+    .pfp-upload-btn:disabled { opacity: 0.5; cursor: default; }
+
     /* --- GROUP CHATS --- */
     .group-modal-card { width: 400px; }
     @media (max-width: 480px) {
@@ -576,6 +605,17 @@
       <h2 style="margin:0;">Iestatījumi</h2>
       <button onclick="closeSettings()" class="btn-small">X</button>
     </div>
+    <div class="pfp-upload-wrap">
+      <div id="settings-avatar" class="user-avatar-lg">?</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:0.88rem;">Profila bilde</div>
+        <div style="font-size:0.75rem;opacity:0.5;margin-top:2px;" id="pfp-upload-status">Nav augšupielādēts</div>
+      </div>
+      <label class="pfp-upload-btn" id="pfp-upload-btn" style="cursor:pointer;">
+        Mainīt
+        <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
+      </label>
+    </div>
     <span class="label-hint">Lietotājvārds</span>
     <input type="text" id="settings-username">
     <span class="label-hint">Dzimšanas datums</span>
@@ -592,25 +632,30 @@
 
 <!-- Profile Modal -->
 <div class="modal-overlay" id="profile-modal">
-  <div class="modal-card" style="max-height:80vh; display:flex; flex-direction:column; overflow:hidden;">
+  <div class="modal-card" style="max-height:85vh; max-width:94vw; width:360px; display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
       <h2 style="margin:0;" id="profile-username">Profils</h2>
       <button onclick="closeProfile()" class="btn-small">X</button>
     </div>
-    <div id="profile-badge" style="margin:8px 0; font-size:0.85rem;"></div>
-    <div id="profile-bio" style="font-size:0.85rem; opacity:0.7; margin-bottom:12px; padding:10px; background:var(--input-bg); border-radius:12px; flex-shrink:0;"></div>
-    <!-- Follow stats -->
-    <div style="display:flex; gap:16px; margin-bottom:12px; flex-shrink:0;">
-      <span id="profile-followers-count" style="font-size:0.85rem; cursor:pointer;" onclick="openFollowList('followers')"><strong id="profile-followers-num">0</strong> sekotāji</span>
-      <span id="profile-following-count" style="font-size:0.85rem; cursor:pointer;" onclick="openFollowList('following')"><strong id="profile-following-num">0</strong> seko</span>
+    <div style="overflow-y:auto; flex:1; scrollbar-width:thin; padding-right:2px;">
+      <div style="display:flex;align-items:center;gap:12px;margin:12px 0 8px;">
+        <img id="profile-avatar-lg" class="user-avatar-lg" alt="avatar" src="" style="display:none;flex-shrink:0;">
+        <div id="profile-badge" style="font-size:0.85rem;"></div>
+      </div>
+      <div id="profile-bio" style="font-size:0.85rem; opacity:0.7; margin-bottom:10px; padding:10px; background:var(--input-bg); border-radius:12px; display:none;"></div>
+      <!-- Follow stats -->
+      <div style="display:flex; gap:16px; margin-bottom:12px;">
+        <span id="profile-followers-count" style="font-size:0.85rem; cursor:pointer;" onclick="openFollowList('followers')"><strong id="profile-followers-num">0</strong> sekotāji</span>
+        <span id="profile-following-count" style="font-size:0.85rem; cursor:pointer;" onclick="openFollowList('following')"><strong id="profile-following-num">0</strong> seko</span>
+      </div>
+      <div id="profile-action-btns" style="display:flex; gap:8px; margin-bottom:12px;">
+        <button id="profile-follow-btn" class="btn-apply" style="display:none; margin:0; padding:10px; flex:1;" onclick="toggleFollow()">Sekot</button>
+        <button id="profile-dm-btn-wrap" class="btn-apply" style="display:none; margin:0; padding:10px; flex:1; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border);" onclick="startDMFromProfile()">💬 Sūtīt ziņu</button>
+        <button id="profile-block-btn" class="btn-apply" style="display:none; margin:0; padding:10px 12px; background:var(--input-bg); color:#FF3B30; border:1px solid #FF3B30; flex-shrink:0;" onclick="toggleBlock()">🚫</button>
+      </div>
+      <div style="font-weight:700; font-size:0.8rem; opacity:0.5; margin-bottom:8px;">ZIŅAS</div>
+      <div id="profile-posts"></div>
     </div>
-    <div id="profile-action-btns" style="display:flex; gap:8px; margin-bottom:12px; flex-shrink:0;">
-      <button id="profile-follow-btn" class="btn-apply" style="display:none; margin:0; padding:10px; flex:1;" onclick="toggleFollow()">Sekot</button>
-      <button id="profile-dm-btn-wrap" class="btn-apply" style="display:none; margin:0; padding:10px; flex:1; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border);" onclick="startDMFromProfile()">💬 Sūtīt ziņu</button>
-      <button id="profile-block-btn" class="btn-apply" style="display:none; margin:0; padding:10px 12px; background:var(--input-bg); color:#FF3B30; border:1px solid #FF3B30; flex-shrink:0;" onclick="toggleBlock()">🚫</button>
-    </div>
-    <div style="font-weight:700; font-size:0.8rem; opacity:0.5; margin-bottom:8px; flex-shrink:0;">ZIŅAS</div>
-    <div id="profile-posts" style="overflow-y:auto; flex:1; scrollbar-width:thin;"></div>
   </div>
 </div>
 
@@ -1009,10 +1054,25 @@ async function signInWithGoogle() {
 function openSettings() {
   if (!userProfile) return;
   document.getElementById('settings-modal').style.display = 'flex';
+  // Attach pfp listener here - guaranteed element exists
+  const fi = document.getElementById('pfp-file-input');
+  if (fi && !fi._pfpListened) {
+    fi._pfpListened = true;
+    fi.addEventListener('change', uploadProfilePicture);
+  }
   document.getElementById('settings-username').value = userProfile.username || "";
   document.getElementById('settings-dob').value = userProfile.dob || "";
   document.getElementById('settings-bio').value = userProfile.bio || "";
   document.getElementById('settings-premium-badge').innerText = userProfile.isPremium ? "Premium ✨" : "Bezmaksas";
+  // Show current avatar
+  const avatarEl = document.getElementById('settings-avatar');
+  if (avatarEl && userProfile.photoURL) {
+    avatarEl.outerHTML = `<img src="${userProfile.photoURL}" id="settings-avatar" class="user-avatar-lg" alt="avatar">`;
+  } else if (avatarEl) {
+    avatarEl.innerText = (userProfile.username || '?')[0].toUpperCase();
+  }
+  const status = document.getElementById('pfp-upload-status');
+  if (status) status.innerText = userProfile.photoURL ? 'Bilde iestatīta ✓' : 'Nav augšupielādēts';
 }
 function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
 async function updateUserSettings() {
@@ -1022,7 +1082,7 @@ async function updateUserSettings() {
     await database.ref('users/' + auth.currentUser.uid).update({
       username, dob: document.getElementById('settings-dob').value, bio
     });
-    await database.ref('user_index/' + auth.currentUser.uid).update({ username, bio });
+    await database.ref('user_index/' + auth.currentUser.uid).update({ username, bio, isPremium: userProfile?.isPremium || false, role: userProfile?.role || 'user' });
     alert("Saglabāts!"); location.reload();
   } catch (e) { alert(e.message); }
 }
@@ -1144,6 +1204,175 @@ async function retryLoadStreets() {
   btn.style.pointerEvents = 'auto';
 }
 
+
+// --- PROFILE PICTURES (Cloudinary) ---
+const CLOUDINARY_CLOUD = 'dxvlkmuke';
+const CLOUDINARY_PRESET = 'thatpfpengine';
+
+function avatarHTML(photoURL, username, cls='user-avatar') {
+  if (photoURL) {
+    return `<img src="${photoURL}" class="${cls}" alt="${username}" onerror="this.outerHTML=avatarInitial('${username}','${cls}')">`;
+  }
+  return avatarInitialEl(username, cls);
+}
+
+function avatarInitialEl(username, cls='user-avatar') {
+  const letter = (username || '?')[0].toUpperCase();
+  return `<div class="${cls}" style="display:inline-flex;align-items:center;justify-content:center;">${letter}</div>`;
+}
+
+function setAvatarEl(el, photoURL, username, cls) {
+  if (!el) return;
+  if (photoURL) {
+    el.outerHTML = `<img src="${photoURL}" id="${el.id}" class="${cls || el.className}" alt="${username}" style="${el.style.cssText}" onerror="this.style.display='none'">`;
+  } else {
+    el.className = cls || el.className;
+    el.innerText = (username || '?')[0].toUpperCase();
+  }
+}
+
+// --- PFP CROP STATE ---
+let pfpCropImgEl = null;
+let pfpCropDragStart = null;
+let pfpCropOffset = { x: 0, y: 0 };
+let pfpCropScale = 1;
+let pfpCropNaturalW = 0;
+let pfpCropNaturalH = 0;
+
+function uploadProfilePicture(event) {
+  try {
+  const file = (event.target || event.currentTarget).files[0];
+  console.log('uploadProfilePicture called, file:', file);
+  if (!file) return;
+  const cropImg = document.getElementById('pfp-crop-img');
+  console.log('pfp-crop-img el:', cropImg);
+  const reader = new FileReader();
+  reader.onload = e => {
+    // Hide settings modal, show crop modal on top
+    document.getElementById('settings-modal').style.display = 'none';
+    const cropModal = document.getElementById('pfp-crop-modal');
+    cropModal.style.display = 'flex';
+    cropModal.style.zIndex = '9999';
+    pfpInitCropListeners();
+    const img = document.getElementById('pfp-crop-img');
+    img.onload = () => {
+      pfpCropNaturalW = img.naturalWidth;
+      pfpCropNaturalH = img.naturalHeight;
+      const fitScale = Math.max(280 / pfpCropNaturalW, 280 / pfpCropNaturalH);
+      pfpCropScale = fitScale;
+      document.getElementById('pfp-crop-zoom').min = fitScale;
+      document.getElementById('pfp-crop-zoom').max = fitScale * 3;
+      document.getElementById('pfp-crop-zoom').value = fitScale;
+      pfpCropOffset.x = (280 - pfpCropNaturalW * fitScale) / 2;
+      pfpCropOffset.y = (280 - pfpCropNaturalH * fitScale) / 2;
+      pfpUpdateTransform();
+      const fi = document.getElementById('pfp-file-input'); if(fi) fi.value = '';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  } catch(err) { console.error('uploadProfilePicture error:', err); }
+}
+
+function pfpUpdateTransform() {
+  pfpCropScale = parseFloat(document.getElementById('pfp-crop-zoom').value);
+  const img = document.getElementById('pfp-crop-img');
+  img.style.width = pfpCropNaturalW * pfpCropScale + 'px';
+  img.style.height = pfpCropNaturalH * pfpCropScale + 'px';
+  img.style.left = pfpCropOffset.x + 'px';
+  img.style.top = pfpCropOffset.y + 'px';
+}
+
+function pfpClampOffset() {
+  const maxX = 0, maxY = 0;
+  const minX = 280 - pfpCropNaturalW * pfpCropScale;
+  const minY = 280 - pfpCropNaturalH * pfpCropScale;
+  pfpCropOffset.x = Math.min(maxX, Math.max(minX, pfpCropOffset.x));
+  pfpCropOffset.y = Math.min(maxY, Math.max(minY, pfpCropOffset.y));
+}
+
+// Drag events
+
+function pfpInitCropListeners() {
+  const area = document.getElementById('pfp-crop-area');
+  if (!area || area._pfpListened) return;
+  area._pfpListened = true;
+  const onDown = (ex, ey) => { pfpCropDragStart = { x: ex - pfpCropOffset.x, y: ey - pfpCropOffset.y }; };
+  const onMove = (ex, ey) => {
+    if (!pfpCropDragStart) return;
+    pfpCropOffset.x = ex - pfpCropDragStart.x;
+    pfpCropOffset.y = ey - pfpCropDragStart.y;
+    pfpClampOffset();
+    pfpUpdateTransform();
+  };
+  const onUp = () => { pfpCropDragStart = null; };
+  area.addEventListener('mousedown', e => onDown(e.clientX, e.clientY));
+  document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+  document.addEventListener('mouseup', onUp);
+  area.addEventListener('touchstart', e => { e.preventDefault(); onDown(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  document.addEventListener('touchmove', e => { if(pfpCropDragStart) { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: false });
+  document.addEventListener('touchend', onUp);
+}
+
+function closePfpCrop() {
+  document.getElementById('pfp-crop-modal').style.display = 'none';
+  document.getElementById('settings-modal').style.display = 'flex';
+  pfpCropDragStart = null;
+}
+
+async function pfpConfirmCrop() {
+  // Render cropped 260x260 circle from the current view
+  const CROP_SIZE = 260;
+  const AREA_SIZE = 280;
+  const circleRadius = 130;
+  const circleCenter = 140;
+  // The circle is centered in 280x280, we crop 260x260 (leaving 10px border)
+  const cropX = circleCenter - circleRadius; // = 10
+  const cropY = circleCenter - circleRadius; // = 10
+  const canvas = document.createElement('canvas');
+  canvas.width = CROP_SIZE;
+  canvas.height = CROP_SIZE;
+  const ctx = canvas.getContext('2d');
+  // Clip to circle
+  ctx.beginPath();
+  ctx.arc(CROP_SIZE / 2, CROP_SIZE / 2, CROP_SIZE / 2, 0, Math.PI * 2);
+  ctx.clip();
+  // Draw image offset by crop position
+  const img = document.getElementById('pfp-crop-img');
+  const drawX = pfpCropOffset.x - cropX;
+  const drawY = pfpCropOffset.y - cropY;
+  ctx.drawImage(img, drawX, drawY, pfpCropNaturalW * pfpCropScale, pfpCropNaturalH * pfpCropScale);
+  closePfpCrop();
+  // Upload
+  const status = document.getElementById('pfp-upload-status');
+  const btn = document.getElementById('pfp-upload-btn');
+  if (status) status.innerText = 'Augšupielādē...';
+  if (btn) btn.style.opacity = '0.5'; btn && (btn.style.pointerEvents = 'none');
+  canvas.toBlob(async (blob) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, 'avatar.jpg');
+      formData.append('upload_preset', CLOUDINARY_PRESET);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
+        method: 'POST', body: formData
+      });
+      const data = await res.json();
+      if (!data.secure_url) throw new Error(data.error?.message || 'Upload failed');
+      const photoURL = data.secure_url;
+      await database.ref(`users/${auth.currentUser.uid}/photoURL`).set(photoURL);
+      await database.ref(`user_index/${auth.currentUser.uid}/photoURL`).set(photoURL);
+      userProfile.photoURL = photoURL;
+      const avatarEl = document.getElementById('settings-avatar');
+      if (avatarEl) avatarEl.outerHTML = `<img src="${photoURL}" id="settings-avatar" class="user-avatar-lg" alt="avatar">`;
+      if (status) status.innerText = 'Saglabāts! ✓';
+      setTimeout(() => { const s = document.getElementById('pfp-upload-status'); if(s) s.innerText = 'Bilde iestatīta ✓'; }, 2000);
+    } catch(e) {
+      if (status) status.innerText = 'Kļūda: ' + e.message;
+    }
+    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }
+  }, 'image/jpeg', 0.85);
+}
+
 // --- GROUP CHATS ---
 let currentGroupId = null;
 let groupMsgListener = null;
@@ -1237,7 +1466,10 @@ async function handleGroupMemberSearch() {
     if (selectedCount >= 9) return; // max 9 + leader = 10
     const row = document.createElement('div');
     row.className = 'group-member-row';
-    row.innerHTML = `<div class="group-avatar">${u.username[0].toUpperCase()}</div><div style="flex:1;font-size:0.88rem;font-weight:600;">${u.username}</div><span style="font-size:0.75rem;opacity:0.4;">+</span>`;
+    const gaEl = u.photoURL
+      ? `<img src="${u.photoURL}" class="group-avatar" style="width:32px;height:32px;" alt="${u.username}" onerror="this.style.display='none'">`
+      : `<div class="group-avatar">${u.username[0].toUpperCase()}</div>`;
+    row.innerHTML = `${gaEl}<div style="flex:1;font-size:0.88rem;font-weight:600;">${u.username}</div><span style="font-size:0.75rem;opacity:0.4;">+</span>`;
     row.onclick = () => {
       groupSelectedMembers[uid] = u.username;
       document.getElementById('group-member-search').value = '';
@@ -1273,9 +1505,12 @@ async function createGroup() {
   const myName = userProfile?.username || auth.currentUser.displayName || 'Lietotājs';
   const gid = database.ref('groups').push().key;
   const now = Date.now();
-  const members = { [myUID]: { username: myName, joinedAt: now, role: 'leader' } };
-  Object.entries(groupSelectedMembers).forEach(([uid, username]) => {
-    members[uid] = { username, joinedAt: now + 1, role: 'member' };
+  const myPhoto = userProfile?.photoURL || null;
+  const members = { [myUID]: { username: myName, joinedAt: now, role: 'leader', photoURL: myPhoto } };
+  // Fetch photos for selected members
+  const photoSnaps = await Promise.all(Object.keys(groupSelectedMembers).map(uid => database.ref(`user_index/${uid}/photoURL`).once('value')));
+  Object.entries(groupSelectedMembers).forEach(([uid, username], i) => {
+    members[uid] = { username, joinedAt: now + 1, role: 'member', photoURL: photoSnaps[i].val() || null };
   });
   const memberCount = Object.keys(members).length;
   const updates = {};
@@ -1320,7 +1555,10 @@ function openGroupChat(gid, name) {
         const isMine = msg.senderUID === auth.currentUser.uid;
         const wrap = document.createElement('div');
         wrap.className = `dm-bubble-wrap ${isMine ? 'sent' : 'received'}`;
-        const nameLabel = !isMine ? `<div style="font-size:0.72rem;font-weight:700;opacity:0.6;margin-bottom:2px;">${msg.senderName}</div>` : '';
+        const senderAvatar = !isMine ? (msg.senderPhoto
+          ? `<img src="${msg.senderPhoto}" class="user-avatar-sm" alt="${msg.senderName}" style="margin-right:5px;" onerror="this.style.display='none'">`
+          : `<span class="user-avatar-sm" style="margin-right:5px;">${(msg.senderName||'?')[0].toUpperCase()}</span>`) : '';
+        const nameLabel = !isMine ? `<div style="font-size:0.72rem;font-weight:700;opacity:0.6;margin-bottom:2px;display:flex;align-items:center;">${senderAvatar}${msg.senderName}</div>` : '';
         const textHTML = msg.text ? `<div class="dm-bubble ${isMine ? 'sent' : 'received'}">${msg.text}</div>` : '';
         const photoHTML = msg.photo ? `<img src="${msg.photo}" onclick="openLightbox(this.src)" style="max-width:200px; border-radius:12px; margin-top:${msg.text ? '4px' : '0'}; cursor:zoom-in; display:block;">` : '';
         wrap.innerHTML = `${nameLabel}${textHTML}${photoHTML}<div class="dm-bubble-meta">${timeAgo(msg.timestamp)}</div>`;
@@ -1358,7 +1596,7 @@ async function sendGroupMessage() {
   const myName = userProfile?.username || auth.currentUser.displayName || 'Lietotājs';
   const ts = Date.now();
   await database.ref(`group_messages/${currentGroupId}`).push({
-    senderUID: myUID, senderName: myName, text: text || null, photo: groupPhotoBase64 || null, timestamp: ts
+    senderUID: myUID, senderName: myName, senderPhoto: userProfile?.photoURL || null, text: text || null, photo: groupPhotoBase64 || null, timestamp: ts
   });
   // Update user_groups for all members
   const membersSnap = await database.ref(`group_members/${currentGroupId}`).once('value');
@@ -1439,8 +1677,11 @@ async function openGroupInfo() {
     if (isLeader && !isMe) {
       removeBtn = `<button onclick="removeGroupMemberById('${uid}', '${m.username}')" style="background:none;border:none;color:#FF3B30;font-size:0.8rem;cursor:pointer;padding:2px 6px;">Noņemt</button>`;
     }
+    const giAvatar = m.photoURL
+      ? `<img src="${m.photoURL}" class="group-avatar" style="width:32px;height:32px;" alt="${m.username}" onerror="this.style.display='none'">`
+      : `<div class="group-avatar">${m.username[0].toUpperCase()}</div>`;
     row.innerHTML = `
-      <div class="group-avatar">${m.username[0].toUpperCase()}</div>
+      ${giAvatar}
       <div style="flex:1;font-size:0.88rem;font-weight:600;">${m.username}${isMe ? ' (Tu)' : ''}${leaderBadge}</div>
       ${removeBtn}
     `;
@@ -1817,6 +2058,7 @@ async function submitPost() {
     username: userProfile?.username || auth.currentUser.displayName || 'Lietotājs',
     isPremium: userProfile?.isPremium || false,
     isAdmin: userProfile?.role === 'admin' || false,
+    photoURL: userProfile?.photoURL || null,
     text: filterText(text),
     photos: feedPhotos.length > 0 ? feedPhotos : null,
     timestamp: Date.now()
@@ -2029,9 +2271,12 @@ function buildPostHTML(key, post, isOwner) {
   const photos = post.photos ? Object.values(post.photos) : (post.photo ? [post.photo] : []);
   const photosHTML = photos.map(src => `<img class="feed-item-img" src="${src}" alt="foto" onclick="openLightbox(this.src)" style="cursor:zoom-in;">`).join('');
 
+  const avatarImg = post.photoURL
+    ? `<img src="${post.photoURL}" class="user-avatar-sm" alt="${post.username}" style="margin-right:6px;" onerror="this.style.display='none'">`
+    : `<span class="user-avatar-sm" style="margin-right:6px;">${(post.username||'?')[0].toUpperCase()}</span>`;
   return `
     <div class="feed-item-header">
-      <span class="feed-item-user" onclick="openProfile('${post.uid}', '${post.username}')">${post.username}${badge}</span>
+      <span class="feed-item-user" onclick="openProfile('${post.uid}', '${post.username}')" style="display:flex;align-items:center;">${avatarImg}${post.username}${badge}</span>
       <span class="feed-item-time">${timeAgo(post.timestamp)}</span>
     </div>
     ${post.text ? `<div class="feed-item-text">${post.text}</div>` : ''}
@@ -2073,6 +2318,7 @@ async function openProfile(uid, username) {
   document.getElementById('profile-username').innerText = username;
   document.getElementById('profile-badge').innerText = '';
   document.getElementById('profile-bio').innerText = '';
+  document.getElementById('profile-bio').style.display = 'none';
   document.getElementById('profile-followers-num').innerText = '0';
   document.getElementById('profile-following-num').innerText = '0';
   document.getElementById('profile-posts').innerHTML = '<div style="opacity:0.4;font-size:0.85rem;padding:10px;">Ielādē...</div>';
@@ -2119,14 +2365,32 @@ async function openProfile(uid, username) {
   document.getElementById('profile-followers-num').innerText = followersSnap.exists() ? Object.keys(followersSnap.val()).length : 0;
   document.getElementById('profile-following-num').innerText = followingSnap.exists() ? Object.keys(followingSnap.val()).length : 0;
 
+  // Reset avatar immediately
+  const existingAvatar = document.getElementById('profile-avatar-lg');
+  if (existingAvatar) { existingAvatar.src = ''; existingAvatar.style.display = 'none'; existingAvatar.alt = username; }
+
   const snap = await database.ref('users/' + uid).once('value');
   const u = snap.val();
   // Fall back to user_index if no data (non-admin reading another user)
-  const indexSnap = u ? null : await database.ref('user_index/' + uid).once('value');
+  const indexSnap = await database.ref('user_index/' + uid).once('value');
   const uData = u || indexSnap?.val();
   if (uData) {
     document.getElementById('profile-badge').innerHTML = uData.role === 'admin' ? '🛡️ <strong>Admin</strong>' : (uData.isPremium ? '✨ <strong>Premium</strong>' : '👤 Bezmaksas');
-    document.getElementById('profile-bio').innerText = uData.bio || 'Nav bio.';
+    const bioEl = document.getElementById('profile-bio');
+    if (uData.bio) { bioEl.innerText = uData.bio; bioEl.style.display = 'block'; }
+    else { bioEl.style.display = 'none'; }
+    // Avatar
+    const photoURL = indexSnap?.val()?.photoURL || u?.photoURL || null;
+    const avatarEl = document.getElementById('profile-avatar-lg');
+    if (avatarEl) {
+      if (photoURL) {
+        avatarEl.src = photoURL;
+        avatarEl.style.display = '';
+      } else {
+        avatarEl.src = '';
+        avatarEl.style.display = 'none';
+      }
+    }
   }
 
   const feedSnap = await database.ref('feed').orderByChild('uid').equalTo(uid).once('value');
@@ -2365,12 +2629,21 @@ function startDMFromProfile() {
 
 function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
 
-function startDMWith(uid, username) {
+async function startDMWith(uid, username) {
   currentDMOtherUID = uid;
   currentDMOtherName = username;
   currentDMConvId = getDMConvId(auth.currentUser.uid, uid);
   document.getElementById('profile-modal').style.display = 'none';
   document.getElementById('inbox-modal').style.display = 'none';
+  // Fetch their photo to store in inbox meta
+  const idxSnap = await database.ref(`user_index/${uid}/photoURL`).once('value');
+  const theirPhoto = idxSnap.val() || null;
+  const myUID = auth.currentUser.uid;
+  const myName = userProfile?.username || auth.currentUser.displayName || 'Lietotājs';
+  const myPhoto = userProfile?.photoURL || null;
+  // Update both sides with photo
+  database.ref(`user_convs/${myUID}/${currentDMConvId}`).update({ otherPhotoURL: theirPhoto });
+  database.ref(`user_convs/${uid}/${currentDMConvId}`).update({ otherPhotoURL: myPhoto });
   openDMChat();
 }
 
@@ -2451,7 +2724,7 @@ async function sendDM() {
   const myUID = auth.currentUser.uid;
   const myName = userProfile?.username || auth.currentUser.displayName || 'Lietotājs';
   await database.ref(`dms/${currentDMConvId}/messages`).push({
-    senderUID: myUID, senderName: myName, text: text || null, photo: dmPhotoBase64 || null, timestamp: Date.now(), read: false
+    senderUID: myUID, senderName: myName, senderPhoto: userProfile?.photoURL || null, text: text || null, photo: dmPhotoBase64 || null, timestamp: Date.now(), read: false
   });
   const preview = text || (dmPhotoBase64 ? '📷 Foto' : '');
   const ts = Date.now();
@@ -2876,7 +3149,10 @@ function openInbox() {
       if (meta.unread) hasUnread = true;
       const item = document.createElement('div');
       item.className = `inbox-item${meta.unread ? ' unread' : ''}`;
-      item.innerHTML = `<div class="inbox-item-name">${meta.otherName}</div><div class="inbox-item-preview">${meta.lastMsg || ''}</div>`;
+      const inboxAvatar = meta.otherPhotoURL
+        ? `<img src="${meta.otherPhotoURL}" class="user-avatar-sm" alt="${meta.otherName}" style="margin-right:8px;flex-shrink:0;" onerror="this.style.display='none'">`
+        : `<span class="user-avatar-sm" style="margin-right:8px;flex-shrink:0;">${(meta.otherName||'?')[0].toUpperCase()}</span>`;
+      item.innerHTML = `<div style="display:flex;align-items:center;">${inboxAvatar}<div><div class="inbox-item-name">${meta.otherName}</div><div class="inbox-item-preview">${meta.lastMsg || ''}</div></div></div>`;
       item.onclick = () => { currentDMConvId = id; currentDMOtherUID = meta.otherUID; currentDMOtherName = meta.otherName; closeInbox(); openDMChat(); };
       list.appendChild(item);
     });
@@ -2943,13 +3219,48 @@ database.ref('feed').orderByChild('timestamp').on('value', (snapshot) => {
 loadStreets();
 </script>
 
+
+<!-- Profile Picture Crop Modal -->
+<div class="modal-overlay" id="pfp-crop-modal" style="display:none;z-index:9999;">
+  <div class="modal-card" style="width:340px;display:flex;flex-direction:column;align-items:center;gap:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+      <h2 style="margin:0;">✂️ Apgriezt bildi</h2>
+      <button onclick="closePfpCrop()" class="btn-small">X</button>
+    </div>
+    <div style="position:relative;width:280px;height:280px;overflow:hidden;border-radius:12px;background:#000;touch-action:none;" id="pfp-crop-area">
+      <img id="pfp-crop-img" style="position:absolute;transform-origin:0 0;cursor:grab;" draggable="false">
+      <!-- circle overlay -->
+      <div style="position:absolute;inset:0;pointer-events:none;">
+        <svg width="280" height="280" style="position:absolute;inset:0;">
+          <defs>
+            <mask id="circle-mask">
+              <rect width="280" height="280" fill="white"/>
+              <circle cx="140" cy="140" r="130" fill="black"/>
+            </mask>
+          </defs>
+          <rect width="280" height="280" fill="rgba(0,0,0,0.55)" mask="url(#circle-mask)"/>
+          <circle cx="140" cy="140" r="130" fill="none" stroke="white" stroke-width="2" opacity="0.7"/>
+        </svg>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;width:100%;">
+      <span style="font-size:0.75rem;opacity:0.5;">🔍</span>
+      <input type="range" id="pfp-crop-zoom" min="1" max="3" step="0.01" value="1" style="flex:1;" oninput="pfpUpdateTransform()">
+      <span style="font-size:0.75rem;opacity:0.5;">🔎</span>
+    </div>
+    <button class="btn-apply" onclick="pfpConfirmCrop()" style="width:100%;margin:0;">Apstiprināt</button>
+  </div>
+</div>
+
 <div id="test-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:9999; background:#FF3B30; color:white; text-align:center; padding:8px; font-size:0.78rem; font-weight:700; letter-spacing:0.05em;">
   ⚠️ THIS IS A TEST VERSION. IT MAY BE UNSTABLE. DEVS ONLY ⚠️
 </div>
 <script>
-  if (window.location.href.includes('dievs-sveti-rezekni-test')) {
-    document.getElementById('test-banner').style.display = 'block';
-  }
+  window.addEventListener('load', () => {
+    if (window.location.href.includes('dievs-sveti-rezekni-test')) {
+      document.getElementById('test-banner').style.display = 'block';
+    }
+  });
 </script>
 </body>
 </html>
