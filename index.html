@@ -531,6 +531,10 @@
     .notif-item.unread { border-left-color: var(--accent); background: var(--input-bg); }
     .notif-item-text { line-height:1.4; }
     .notif-item-time { font-size:0.75rem; opacity:0.4; margin-top:3px; }
+    /* --- ONLINE STATUS --- */
+    .online-dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#34C759; flex-shrink:0; box-shadow:0 0 0 2px var(--bg-panel); }
+    .online-dot.offline { background:#8E8E93; }
+    .online-status-text { font-size:0.75rem; opacity:0.55; }
   </style>
 </head>
 <body>
@@ -625,6 +629,17 @@
     <div id="settings-stats" style="margin:15px 0; padding:12px; background:var(--input-bg); border-radius:12px; font-size:0.9rem;">
       Statuss: <span id="settings-premium-badge">Parasts</span>
     </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--input-bg); border-radius:12px; margin-bottom:15px;">
+      <div>
+        <div style="font-weight:600; font-size:0.88rem;">Slēpt tiešsaistes statusu</div>
+        <div style="font-size:0.75rem; opacity:0.5; margin-top:2px;">Citi neredzēs, vai esi tiešsaistē</div>
+      </div>
+      <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+        <input type="checkbox" id="settings-hide-online" style="opacity:0; width:0; height:0;">
+        <span id="online-toggle-track" style="position:absolute; cursor:pointer; inset:0; background:#8E8E93; border-radius:26px; transition:0.2s;"></span>
+        <span id="online-toggle-thumb" style="position:absolute; left:3px; top:3px; width:20px; height:20px; background:white; border-radius:50%; transition:0.2s; pointer-events:none;"></span>
+      </label>
+    </div>
     <button class="btn-apply" onclick="updateUserSettings()">Saglabāt izmaiņas</button>
     <button class="btn-danger" onclick="deleteOwnAccount()">Dzēst manu kontu</button>
   </div>
@@ -640,7 +655,10 @@
     <div style="overflow-y:auto; flex:1; scrollbar-width:thin; padding-right:2px;">
       <div style="display:flex;align-items:center;gap:12px;margin:12px 0 8px;">
         <img id="profile-avatar-lg" class="user-avatar-lg" alt="avatar" src="" style="display:none;flex-shrink:0;">
-        <div id="profile-badge" style="font-size:0.85rem;"></div>
+        <div>
+          <div id="profile-badge" style="font-size:0.85rem;"></div>
+          <div id="profile-online-status" style="display:flex; align-items:center; gap:5px; margin-top:5px;"></div>
+        </div>
       </div>
       <div id="profile-bio" style="font-size:0.85rem; opacity:0.7; margin-bottom:10px; padding:10px; background:var(--input-bg); border-radius:12px; display:none;"></div>
       <!-- Follow stats -->
@@ -717,7 +735,10 @@
 <div class="modal-overlay" id="dm-modal" style="display:none;">
   <div class="modal-card dm-modal-card" style="max-height:80vh; display:flex; flex-direction:column; overflow:hidden;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0; gap:8px;">
-      <h2 style="margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1;" id="dm-chat-title">Saruna</h2>
+      <div style="min-width:0; flex:1; overflow:hidden;">
+        <h2 style="margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="dm-chat-title">Saruna</h2>
+        <div id="dm-online-status" style="display:flex; align-items:center; gap:5px; margin-top:2px;"></div>
+      </div>
       <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
         <button onclick="startCall()" class="dm-icon-btn" id="call-btn" title="Audio zvans">📞</button>
         <button onclick="startVideoCall()" class="dm-icon-btn" id="video-call-btn" title="Video zvans">🎥</button>
@@ -1023,12 +1044,82 @@ auth.onAuthStateChanged(async (user) => {
     watchIncomingCalls(user.uid);
     // Watch for group unread badge
     watchGroupBadge(user.uid);
+    // Set up presence
+    initPresence(user.uid);
   } else {
     document.getElementById('logged-out-ui').style.display = 'block';
     document.getElementById('logged-in-ui').style.display = 'none';
     if (typeof updateComposeVisibility === 'function') updateComposeVisibility();
   }
 });
+
+
+// --- ONLINE STATUS ---
+let presenceHeartbeat = null;
+
+function initPresence(uid) {
+  const statusRef = database.ref("status/" + uid);
+  const getStatusPayload = (online) => ({
+    online,
+    lastSeen: firebase.database.ServerValue.TIMESTAMP,
+    hideOnline: userProfile?.hideOnline || false
+  });
+  database.ref(".info/connected").on("value", snap => {
+    if (!snap.val()) return;
+    statusRef.onDisconnect().set(getStatusPayload(false));
+    statusRef.update(getStatusPayload(true));
+  });
+  // Heartbeat every 60s to keep lastSeen fresh
+  if (presenceHeartbeat) clearInterval(presenceHeartbeat);
+  presenceHeartbeat = setInterval(() => {
+    if (auth.currentUser) {
+      statusRef.update(getStatusPayload(true));
+    }
+  }, 60000);
+}
+
+function timeAgoShort(ts) {
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "tikko";
+  if (m < 60) return m + " min. atpakaļ";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + " st. atpakaļ";
+  return Math.floor(h / 24) + " d. atpakaļ";
+}
+
+const STALE_MS = 2.5 * 60 * 1000; // 2.5 minutes
+
+function renderOnlineStatus(data, elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!data || data.hideOnline) { el.innerHTML = ""; return; }
+  const stale = data.lastSeen && (Date.now() - data.lastSeen) > STALE_MS;
+  const isOnline = data.online && !stale;
+  if (isOnline) {
+    el.innerHTML = "<span class=\"online-dot\"></span><span class=\"online-status-text\">Tiešsaistē</span>";
+  } else {
+    const t = data.lastSeen ? timeAgoShort(data.lastSeen) : "";
+    el.innerHTML = "<span class=\"online-dot offline\"></span><span class=\"online-status-text\">" + (t ? "Bija " + t : "Bezsaistē") + "</span>";
+  }
+}
+
+let profileStatusListener = null;
+let dmStatusListener = null;
+
+function watchProfileStatus(uid) {
+  if (profileStatusListener) profileStatusListener();
+  const ref = database.ref("status/" + uid);
+  const handler = ref.on("value", snap => renderOnlineStatus(snap.val(), "profile-online-status"));
+  profileStatusListener = () => ref.off("value", handler);
+}
+
+function watchDMStatus(uid) {
+  if (dmStatusListener) dmStatusListener();
+  const ref = database.ref("status/" + uid);
+  const handler = ref.on("value", snap => renderOnlineStatus(snap.val(), "dm-online-status"));
+  dmStatusListener = () => ref.off("value", handler);
+}
 
 async function signInWithGoogle() {
   try {
@@ -1073,16 +1164,31 @@ function openSettings() {
   }
   const status = document.getElementById('pfp-upload-status');
   if (status) status.innerText = userProfile.photoURL ? 'Bilde iestatīta ✓' : 'Nav augšupielādēts';
+  // Load hide online status toggle
+  const hideOnline = userProfile.hideOnline || false;
+  const cb = document.getElementById('settings-hide-online');
+  const track = document.getElementById('online-toggle-track');
+  const thumb = document.getElementById('online-toggle-thumb');
+  if (cb) cb.checked = hideOnline;
+  if (track) track.style.background = hideOnline ? 'var(--accent)' : '#8E8E93';
+  if (thumb) thumb.style.left = hideOnline ? '21px' : '3px';
+  if (cb) cb.addEventListener('change', () => {
+    const v = cb.checked;
+    if (track) track.style.background = v ? 'var(--accent)' : '#8E8E93';
+    if (thumb) thumb.style.left = v ? '21px' : '3px';
+  });
 }
 function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
 async function updateUserSettings() {
+  const hideOnline = document.getElementById('settings-hide-online')?.checked || false;
   try {
     const username = document.getElementById('settings-username').value;
     const bio = document.getElementById('settings-bio').value;
     await database.ref('users/' + auth.currentUser.uid).update({
-      username, dob: document.getElementById('settings-dob').value, bio
+      username, dob: document.getElementById('settings-dob').value, bio, hideOnline
     });
     await database.ref('user_index/' + auth.currentUser.uid).update({ username, bio, isPremium: userProfile?.isPremium || false, role: userProfile?.role || 'user' });
+    await database.ref('status/' + auth.currentUser.uid).update({ hideOnline });
     alert("Saglabāts!"); location.reload();
   } catch (e) { alert(e.message); }
 }
@@ -1973,7 +2079,16 @@ document.addEventListener('click', e => {
     dropdown.classList.remove('open');
   }
 });
-function handleLogout() { auth.signOut().then(() => location.reload()); }
+function handleLogout() {
+  const uid = auth.currentUser?.uid;
+  if (presenceHeartbeat) { clearInterval(presenceHeartbeat); presenceHeartbeat = null; }
+  const finish = () => auth.signOut().then(() => location.reload());
+  if (uid) {
+    database.ref("status/" + uid).set({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP }).then(finish).catch(finish);
+  } else {
+    finish();
+  }
+}
 
 // --- BLOG FEED ---
 let feedPhotos = []; // array of base64 strings
@@ -2314,6 +2429,7 @@ let currentProfileUID = null;
 
 async function openProfile(uid, username) {
   currentProfileUID = uid;
+  watchProfileStatus(uid);
   document.getElementById('profile-modal').style.display = 'flex';
   document.getElementById('profile-username').innerText = username;
   document.getElementById('profile-badge').innerText = '';
@@ -2627,7 +2743,7 @@ function startDMFromProfile() {
   startDMWith(currentProfileUID, username);
 }
 
-function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
+function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; if (profileStatusListener) { profileStatusListener(); profileStatusListener = null; } }
 
 async function startDMWith(uid, username) {
   currentDMOtherUID = uid;
@@ -2650,6 +2766,7 @@ async function startDMWith(uid, username) {
 function openDMChat() {
   document.getElementById('dm-modal').style.display = 'flex';
   document.getElementById('dm-chat-title').innerText = currentDMOtherName;
+  watchDMStatus(currentDMOtherUID);
   document.getElementById('dm-messages').innerHTML = '';
   if (dmListener) { database.ref(`dms/${currentDMConvId}/messages`).off('value', dmListener); dmListener = null; }
   dmListener = database.ref(`dms/${currentDMConvId}/messages`).orderByChild('timestamp').on('value', snap => {
@@ -2739,6 +2856,7 @@ async function sendDM() {
 }
 
 function closeDM() {
+  if (dmStatusListener) { dmStatusListener(); dmStatusListener = null; }
   if (dmListener) { database.ref(`dms/${currentDMConvId}/messages`).off('value', dmListener); dmListener = null; }
   document.getElementById('dm-modal').style.display = 'none';
 }
@@ -3152,9 +3270,20 @@ function openInbox() {
       const inboxAvatar = meta.otherPhotoURL
         ? `<img src="${meta.otherPhotoURL}" class="user-avatar-sm" alt="${meta.otherName}" style="margin-right:8px;flex-shrink:0;" onerror="this.style.display='none'">`
         : `<span class="user-avatar-sm" style="margin-right:8px;flex-shrink:0;">${(meta.otherName||'?')[0].toUpperCase()}</span>`;
-      item.innerHTML = `<div style="display:flex;align-items:center;">${inboxAvatar}<div><div class="inbox-item-name">${meta.otherName}</div><div class="inbox-item-preview">${meta.lastMsg || ''}</div></div></div>`;
+      const onlineDotId = 'inbox-dot-' + id;
+      item.innerHTML = `<div style="display:flex;align-items:center;gap:8px;"><div style="position:relative;flex-shrink:0;">${inboxAvatar}<span id="${onlineDotId}" style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-radius:50%;background:#8E8E93;border:2px solid var(--bg-panel);display:none;"></span></div><div style="flex:1;min-width:0;"><div class="inbox-item-name">${meta.otherName}</div><div class="inbox-item-preview">${meta.lastMsg || ''}</div></div></div>`;
       item.onclick = () => { currentDMConvId = id; currentDMOtherUID = meta.otherUID; currentDMOtherName = meta.otherName; closeInbox(); openDMChat(); };
       list.appendChild(item);
+      // Watch online status for this conversation
+      if (meta.otherUID) {
+        database.ref('status/' + meta.otherUID).once('value').then(snap => {
+          const s = snap.val();
+          const dot = document.getElementById(onlineDotId);
+          if (!dot || !s || s.hideOnline) return;
+          dot.style.display = 'block';
+          dot.style.background = s.online ? '#34C759' : '#8E8E93';
+        });
+      }
     });
     document.getElementById('dm-unread-badge').style.display = hasUnread ? 'block' : 'none';
   });
