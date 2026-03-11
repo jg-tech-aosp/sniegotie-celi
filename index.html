@@ -1214,8 +1214,11 @@ async function signInWithGoogle() {
 }
 
 // Called by Android native Google Sign-In bridge
-async function receiveNativeGoogleToken(uid, displayName, email, photoURL) {
+async function receiveNativeGoogleToken(idToken, uid, displayName, email, photoURL) {
   try {
+    // Sign into Firebase Auth on the web side using the ID token
+    const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+    await auth.signInWithCredential(credential);
     // Check if user exists in DB, if not create them
     const snapshot = await database.ref('users/' + uid).once('value');
     if (!snapshot.exists()) {
@@ -1235,8 +1238,7 @@ async function receiveNativeGoogleToken(uid, displayName, email, photoURL) {
       });
     }
     closeAuth();
-    // Reload to pick up auth state
-    location.reload();
+    // onAuthStateChanged will handle UI update
   } catch (e) {
     alert("Kļūda: " + e.message);
   }
