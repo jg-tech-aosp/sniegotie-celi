@@ -1194,7 +1194,6 @@ function toggleFeedPanel(open) {
 const GAMES = [
   { id: 'matiisa', name: "Matīsa spēle", icon: '🖱️', desc: 'Klikšķu spēle', url: 'https://lietupircejs-pixel.github.io/Matiisa-speele/' },
   { id: 'breakout', name: '2048', icon: '🔢', desc: 'Klasiska skaitļu spēle', url: 'https://mgarciaisaia.github.io/2048/' },
-  // { id: '2048', name: '2048', icon: '🔢', desc: 'Skaitļu puzzle', url: '' },
 ];
 
 function openGames() {
@@ -1242,7 +1241,6 @@ auth.onAuthStateChanged(async (user) => {
     }
     if (userProfile?.isPremium) unlockPedestrianFeature();
     if (typeof updateComposeVisibility === 'function') updateComposeVisibility();
-    // Watch for unread DMs
     database.ref(`user_convs/${user.uid}`).on('value', snap => {
       const val = snap.val();
       const badge = document.getElementById('dm-unread-badge');
@@ -1251,15 +1249,10 @@ auth.onAuthStateChanged(async (user) => {
       if (badge) badge.style.display = hasUnread ? 'block' : 'none';
       if (badgeM) badgeM.style.display = hasUnread ? 'inline-block' : 'none';
     });
-    // Watch for unread notifications
     watchNotifBadge(user.uid);
-    // Load blocked users
     loadBlockedUsers(user.uid);
-    // Watch for incoming calls
     watchIncomingCalls(user.uid);
-    // Watch for group unread badge
     watchGroupBadge(user.uid);
-    // Set up presence
     initPresence(user.uid);
   } else {
     document.getElementById('logged-out-ui').style.display = 'block';
@@ -1284,12 +1277,9 @@ function initPresence(uid) {
     statusRef.onDisconnect().set(getStatusPayload(false));
     statusRef.update(getStatusPayload(true));
   });
-  // Heartbeat every 60s to keep lastSeen fresh
   if (presenceHeartbeat) clearInterval(presenceHeartbeat);
   presenceHeartbeat = setInterval(() => {
-    if (auth.currentUser) {
-      statusRef.update(getStatusPayload(true));
-    }
+    if (auth.currentUser) statusRef.update(getStatusPayload(true));
   }, 60000);
 }
 
@@ -1303,7 +1293,7 @@ function timeAgoShort(ts) {
   return Math.floor(h / 24) + " d. atpakaļ";
 }
 
-const STALE_MS = 2.5 * 60 * 1000; // 2.5 minutes
+const STALE_MS = 2.5 * 60 * 1000;
 
 function renderOnlineStatus(data, elId) {
   const el = document.getElementById(elId);
@@ -1337,7 +1327,6 @@ function watchDMStatus(uid) {
 }
 
 async function signInWithGoogle() {
-  // If running in Android WebView, use native bridge instead
   if (window.AndroidBridge) {
     window.AndroidBridge.startGoogleSignIn();
     return;
@@ -1361,14 +1350,11 @@ async function signInWithGoogle() {
   }
 }
 
-// Called by Android native Google Sign-In bridge
 async function receiveNativeGooglePayload(payload) {
   try {
     const { idToken, uid, name: displayName, email, photo: photoURL } = payload;
-    // Sign into Firebase Auth on the web side using the ID token
     const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
     await auth.signInWithCredential(credential);
-    // Check if user exists in DB, if not create them
     const snapshot = await database.ref('users/' + uid).once('value');
     if (!snapshot.exists()) {
       await database.ref('users/' + uid).set({
@@ -1387,7 +1373,6 @@ async function receiveNativeGooglePayload(payload) {
       });
     }
     closeAuth();
-    // onAuthStateChanged will handle UI update
   } catch (e) {
     alert("Kļūda: " + e.message);
   }
@@ -1401,7 +1386,6 @@ function receiveNativeGoogleError(msg) {
 function openSettings() {
   if (!userProfile) return;
   openModal('settings-modal');
-  // Attach pfp listener here - guaranteed element exists
   const fi = document.getElementById('pfp-file-input');
   if (fi && !fi._pfpListened) {
     fi._pfpListened = true;
@@ -1411,7 +1395,6 @@ function openSettings() {
   document.getElementById('settings-dob').value = userProfile.dob || "";
   document.getElementById('settings-bio').value = userProfile.bio || "";
   document.getElementById('settings-premium-badge').innerText = userProfile.isPremium ? "Premium ✨" : "Bezmaksas";
-  // Show current avatar
   const avatarEl = document.getElementById('settings-avatar');
   if (avatarEl && userProfile.photoURL) {
     avatarEl.outerHTML = `<img src="${userProfile.photoURL}" id="settings-avatar" class="user-avatar-lg" alt="avatar">`;
@@ -1420,7 +1403,6 @@ function openSettings() {
   }
   const status = document.getElementById('pfp-upload-status');
   if (status) status.innerText = userProfile.photoURL ? 'Bilde iestatīta ✓' : 'Nav augšupielādēts';
-  // Load hide online status toggle
   const hideOnline = userProfile.hideOnline || false;
   const cb = document.getElementById('settings-hide-online');
   const track = document.getElementById('online-toggle-track');
@@ -1536,7 +1518,6 @@ function setTheme(theme) {
 }
 setTheme(currentTheme);
 
-// FIX: return grey when street is clean (both flags false), not blue
 function getColor(state) {
   if (!state) return "#94a3b8";
   if (state.cars && state.ped) return "#ef4444";
@@ -1610,7 +1591,6 @@ function uploadProfilePicture(event) {
   console.log('pfp-crop-img el:', cropImg);
   const reader = new FileReader();
   reader.onload = e => {
-    // Hide settings modal, show crop modal on top
     closeModal('settings-modal');
     const cropModal = document.getElementById('pfp-crop-modal');
     openModal('pfp-crop-modal');
@@ -1653,8 +1633,6 @@ function pfpClampOffset() {
   pfpCropOffset.y = Math.min(maxY, Math.max(minY, pfpCropOffset.y));
 }
 
-// Drag events
-
 function pfpInitCropListeners() {
   const area = document.getElementById('pfp-crop-area');
   if (!area || area._pfpListened) return;
@@ -1683,29 +1661,24 @@ function closePfpCrop() {
 }
 
 async function pfpConfirmCrop() {
-  // Render cropped 260x260 circle from the current view
   const CROP_SIZE = 260;
   const AREA_SIZE = 280;
   const circleRadius = 130;
   const circleCenter = 140;
-  // The circle is centered in 280x280, we crop 260x260 (leaving 10px border)
-  const cropX = circleCenter - circleRadius; // = 10
-  const cropY = circleCenter - circleRadius; // = 10
+  const cropX = circleCenter - circleRadius;
+  const cropY = circleCenter - circleRadius;
   const canvas = document.createElement('canvas');
   canvas.width = CROP_SIZE;
   canvas.height = CROP_SIZE;
   const ctx = canvas.getContext('2d');
-  // Clip to circle
   ctx.beginPath();
   ctx.arc(CROP_SIZE / 2, CROP_SIZE / 2, CROP_SIZE / 2, 0, Math.PI * 2);
   ctx.clip();
-  // Draw image offset by crop position
   const img = document.getElementById('pfp-crop-img');
   const drawX = pfpCropOffset.x - cropX;
   const drawY = pfpCropOffset.y - cropY;
   ctx.drawImage(img, drawX, drawY, pfpCropNaturalW * pfpCropScale, pfpCropNaturalH * pfpCropScale);
   closePfpCrop();
-  // Upload
   const status = document.getElementById('pfp-upload-status');
   const btn = document.getElementById('pfp-upload-btn');
   if (status) status.innerText = 'Augšupielādē...';
@@ -1739,14 +1712,8 @@ async function pfpConfirmCrop() {
 let currentGroupId = null;
 let groupMsgListener = null;
 let groupsListListener = null;
-let groupSelectedMembers = {}; // uid -> username
+let groupSelectedMembers = {};
 let groupPhotoBase64 = null;
-
-// Firebase structure:
-// groups/{groupId}: { name, createdBy, createdAt, memberCount }
-// group_members/{groupId}/{uid}: { username, joinedAt, role: 'leader'|'member' }
-// group_messages/{groupId}/{msgId}: { senderUID, senderName, text, photo, timestamp }
-// user_groups/{uid}/{groupId}: { name, lastMsg, lastTs, unread }
 
 function openGroupsList() {
   if (!auth.currentUser) return;
@@ -1807,7 +1774,6 @@ async function handleGroupMemberSearch() {
   const results = document.getElementById('group-member-search-results');
   if (query.length < 1) { results.innerHTML = ''; return; }
   const myUID = auth.currentUser.uid;
-  // Get mutual follows: users I follow AND who follow me
   const [followingSnap, followersSnap] = await Promise.all([
     database.ref(`following/${myUID}`).once('value'),
     database.ref(`followers/${myUID}`).once('value')
@@ -1816,16 +1782,15 @@ async function handleGroupMemberSearch() {
   const followers = followersSnap.val() || {};
   const mutuals = Object.keys(following).filter(uid => followers[uid]);
   if (mutuals.length === 0) { results.innerHTML = '<div class="sc-muted-pad-sm">Nav savstarpējo sekotāju.</div>'; return; }
-  // Fetch usernames and filter by query
   const userSnaps = await Promise.all(mutuals.map(uid => database.ref(`user_index/${uid}`).once('value')));
   results.innerHTML = '';
   userSnaps.forEach((snap, i) => {
     const u = snap.val();
     const uid = mutuals[i];
     if (!u || !u.username.toLowerCase().includes(query)) return;
-    if (groupSelectedMembers[uid]) return; // already added
+    if (groupSelectedMembers[uid]) return;
     const selectedCount = Object.keys(groupSelectedMembers).length;
-    if (selectedCount >= 9) return; // max 9 + leader = 10
+    if (selectedCount >= 9) return;
     const row = document.createElement('div');
     row.className = 'group-member-row';
     const gaEl = u.photoURL
@@ -1869,7 +1834,6 @@ async function createGroup() {
   const now = Date.now();
   const myPhoto = userProfile?.photoURL || null;
   const members = { [myUID]: { username: myName, joinedAt: now, role: 'leader', photoURL: myPhoto } };
-  // Fetch photos for selected members
   const photoSnaps = await Promise.all(Object.keys(groupSelectedMembers).map(uid => database.ref(`user_index/${uid}/photoURL`).once('value')));
   Object.entries(groupSelectedMembers).forEach(([uid, username], i) => {
     members[uid] = { username, joinedAt: now + 1, role: 'member', photoURL: photoSnaps[i].val() || null };
@@ -1932,7 +1896,6 @@ function openGroupChat(gid, name) {
       });
       container.scrollTop = container.scrollHeight;
     }
-    // Mark as read
     if (auth.currentUser) {
       database.ref(`user_groups/${auth.currentUser.uid}/${gid}/unread`).set(false);
     }
@@ -1964,7 +1927,6 @@ async function sendGroupMessage() {
   await database.ref(`group_messages/${currentGroupId}`).push({
     senderUID: myUID, senderName: myName, senderPhoto: userProfile?.photoURL || null, text: text || null, photo: groupPhotoBase64 || null, timestamp: ts, replyTo: grpReplyTo || null
   });
-  // Update user_groups for all members
   const membersSnap = await database.ref(`group_members/${currentGroupId}`).once('value');
   const members = membersSnap.val() || {};
   const groupSnap = await database.ref(`groups/${currentGroupId}/name`).once('value');
@@ -2029,7 +1991,6 @@ async function openGroupInfo() {
   const isLeader = myRole === 'leader';
   const list = document.getElementById('group-info-members');
   list.innerHTML = '';
-  // Sort: leader first, then by joinedAt
   const sorted = Object.entries(members).sort((a, b) => {
     if (a[1].role === 'leader') return -1;
     if (b[1].role === 'leader') return 1;
@@ -2055,10 +2016,8 @@ async function openGroupInfo() {
     list.appendChild(row);
   });
 
-  // Actions
   const actions = document.getElementById('group-info-actions');
   actions.innerHTML = '';
-  // Add member button (leader only, if under 10)
   if (isLeader && Object.keys(members).length < 10) {
     const addBtn = document.createElement('button');
     addBtn.className = 'btn-apply';
@@ -2067,7 +2026,6 @@ async function openGroupInfo() {
     addBtn.onclick = () => openAddMemberToGroup(members);
     actions.appendChild(addBtn);
   }
-  // Leave group
   const leaveBtn = document.createElement('button');
   leaveBtn.className = 'btn-danger';
   leaveBtn.innerText = isLeader ? 'Iziet (nodot vadību nākamajam)' : 'Iziet no grupas';
@@ -2084,7 +2042,6 @@ async function removeGroupMemberById(uid, username) {
   const updates = {};
   updates[`group_members/${currentGroupId}/${uid}`] = null;
   updates[`user_groups/${uid}/${currentGroupId}`] = null;
-  // Update member count
   const snap = await database.ref(`group_members/${currentGroupId}`).once('value');
   const count = Object.keys(snap.val() || {}).length - 1;
   updates[`groups/${currentGroupId}/memberCount`] = count;
@@ -2102,14 +2059,12 @@ async function leaveGroup(members) {
   updates[`user_groups/${myUID}/${currentGroupId}`] = null;
   const remaining = Object.entries(members).filter(([uid]) => uid !== myUID);
   if (remaining.length === 0) {
-    // Last member — delete group entirely
     updates[`groups/${currentGroupId}`] = null;
     updates[`group_messages/${currentGroupId}`] = null;
     updates[`group_members/${currentGroupId}`] = null;
   } else {
     updates[`groups/${currentGroupId}/memberCount`] = remaining.length;
     if (myRole === 'leader') {
-      // Transfer to earliest joiner
       const next = remaining.sort((a, b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0))[0];
       updates[`group_members/${currentGroupId}/${next[0]}/role`] = 'leader';
     }
@@ -2119,12 +2074,10 @@ async function leaveGroup(members) {
   closeGroup();
 }
 
-// Add member to existing group
 let addMemberCurrentMembers = {};
 function openAddMemberToGroup(currentMembers) {
   addMemberCurrentMembers = currentMembers;
   closeGroupInfo();
-  // Reuse group create modal in "add member" mode
   openModal('group-create-modal');
   document.getElementById('group-name-input').style.display = 'none';
   document.getElementById('group-create-modal').querySelector('h2').innerText = '➕ Pievienot dalībnieku';
@@ -2132,7 +2085,6 @@ function openAddMemberToGroup(currentMembers) {
   document.getElementById('group-member-search-results').innerHTML = '';
   groupSelectedMembers = {};
   renderSelectedMembers();
-  // Override create button
   const btn = document.getElementById('group-create-modal').querySelector('.btn-apply');
   btn.innerText = 'Pievienot';
   btn.onclick = addMembersToGroup;
@@ -2151,7 +2103,6 @@ async function addMembersToGroup() {
   const newCount = Object.keys(addMemberCurrentMembers).length + Object.keys(groupSelectedMembers).length;
   updates[`groups/${currentGroupId}/memberCount`] = newCount;
   await database.ref().update(updates);
-  // Reset modal
   document.getElementById('group-name-input').style.display = '';
   document.getElementById('group-create-modal').querySelector('h2').innerText = '👥 Jauna grupa';
   const btn = document.getElementById('group-create-modal').querySelector('.btn-apply');
@@ -2161,7 +2112,6 @@ async function addMembersToGroup() {
   openGroupInfo();
 }
 
-// Watch for group unread badge
 function watchGroupBadge(uid) {
   database.ref(`user_groups/${uid}`).on('value', snap => {
     const val = snap.val();
@@ -2193,10 +2143,19 @@ async function loadStreets() {
           const state = streetStates[id] || { cars:false, ped:false };
           document.getElementById("carsCheck").checked = state.cars;
           if (isPedestrianUnlocked) document.getElementById("pedCheck").checked = state.ped;
+
+          // --- LOCK LOGIC ---
+          const uid = auth.currentUser?.uid || 'guest';
+          const isAdmin = userProfile?.role === 'admin';
+          const canClearCars = !state.cars || !state.cars_by || state.cars_by === uid || isAdmin;
+          const canClearPed = !state.ped || !state.ped_by || state.ped_by === uid || isAdmin;
+          document.getElementById("carsCheck").disabled = !canClearCars;
+          document.getElementById("pedCheck").disabled = !canClearPed || !isPedestrianUnlocked;
+
           const p = document.getElementById("panel"); p.style.display = 'flex'; requestAnimationFrame(() => requestAnimationFrame(() => p.classList.add('anim-open')));
-          // Show history section for admins
+
           const historySection = document.getElementById('street-history-section');
-          if (userProfile?.role === 'admin') {
+          if (isAdmin) {
             historySection.style.display = 'block';
             loadStreetHistory(id);
           } else {
@@ -2255,18 +2214,46 @@ function applyStatus() {
     alert("⛔ Jums ir aizliegts atzīmēt ielas.");
     return;
   }
-  const id = selectedLayer.feature.properties.id;
-  const cars = document.getElementById("carsCheck").checked;
-  const ped = isPedestrianUnlocked ? document.getElementById("pedCheck").checked : (streetStates[id]?.ped || false);
 
-  database.ref('streets/' + id).set({ cars, ped });
+  const id = selectedLayer.feature.properties.id;
+  const state = streetStates[id] || {};
+  const uid = auth.currentUser?.uid || 'guest';
+  const isAdmin = userProfile?.role === 'admin';
+  const cars = document.getElementById("carsCheck").checked;
+  const ped = isPedestrianUnlocked ? document.getElementById("pedCheck").checked : (state.ped || false);
+
+  const updates = {};
+
+  if (cars !== state.cars) {
+    if (!cars && state.cars_by && state.cars_by !== uid && !isAdmin) {
+      alert("Tikai tas, kurš atzīmēja, vai admins var noņemt šo atzīmi.");
+      document.getElementById("carsCheck").checked = true;
+    } else {
+      updates.cars = cars;
+      updates.cars_by = cars ? uid : null;
+    }
+  }
+
+  if (ped !== state.ped) {
+    if (!ped && state.ped_by && state.ped_by !== uid && !isAdmin) {
+      alert("Tikai tas, kurš atzīmēja, vai admins var noņemt šo atzīmi.");
+      document.getElementById("pedCheck").checked = true;
+    } else {
+      updates.ped = ped;
+      updates.ped_by = ped ? uid : null;
+    }
+  }
+
+  if (Object.keys(updates).length === 0) return;
+
+  database.ref('streets/' + id).update(updates);
 
   // Log history entry
   const historyEntry = {
     uid: auth.currentUser?.uid || 'guest',
     username: userProfile?.username || auth.currentUser?.displayName || 'Viesis',
-    cars,
-    ped,
+    cars: cars,
+    ped: ped,
     timestamp: Date.now()
   };
   database.ref(`street_history/${id}`).push(historyEntry);
@@ -2340,7 +2327,6 @@ function toggleNavDropdown() {
     requestAnimationFrame(() => requestAnimationFrame(() => dd.classList.add('open')));
   }
 }
-// Close dropdown when clicking outside
 document.addEventListener('click', e => {
   const dropdown = document.getElementById('nav-dropdown');
   if (dropdown && !dropdown.closest('.auth-nav')?.contains(e.target)) {
@@ -2359,7 +2345,7 @@ function handleLogout() {
 }
 
 // --- BLOG FEED ---
-let feedPhotos = []; // array of base64 strings
+let feedPhotos = [];
 let isFeedOpen = false;
 
 function toggleFeed() {
@@ -2370,7 +2356,6 @@ function toggleFeed() {
 
 function updateComposeVisibility() {
   document.getElementById('feed-compose').style.display = auth.currentUser ? 'flex' : 'none';
-  // Show/hide PayPal button based on login state
   const paypalBtn = document.getElementById('paypal-button-container');
   const guestMsg = document.getElementById('paypal-guest-msg');
   if (paypalBtn && guestMsg) {
@@ -2446,7 +2431,6 @@ async function submitPost() {
     timestamp: Date.now()
   };
   await database.ref('feed').push(post);
-  // Notify all followers
   const followersSnap = await database.ref(`followers/${auth.currentUser.uid}`).once('value');
   if (followersSnap.exists()) {
     const myName = userProfile?.username || auth.currentUser.displayName || 'Lietotājs';
@@ -2466,7 +2450,6 @@ async function submitPost() {
 
 // --- CHAT FILTER ---
 const BANNED_WORDS = [
-  // Latvian (singular + plural + case forms)
   'mauka', 'maukas', 'mauku',
   'pičkas', 'pička', 'pičkā', 'pičku',
   'pizda', 'pizdu', 'pizdi',
@@ -2475,7 +2458,6 @@ const BANNED_WORDS = [
   'muds', 'mudā', 'mudi', 'mudu',
   'hujs', 'huja', 'hujā', 'huji', 'huju',
   'mīzt', 'pakaļa', 'pakalā', 'pakaļas', 'pakaļu', 'nobīsties',
-  // Russian (transliterated + plurals)
   'blyad', 'blyadi', 'blya',
   'pizda', 'pizdy', 'pizd',
   'huy', 'hui', 'huya', 'huyev',
@@ -2485,7 +2467,6 @@ const BANNED_WORDS = [
   'zalupa', 'zalupy',
   'mudak', 'mudaki', 'muda',
   'cyka', 'cyki',
-  // English (word-boundary matched, with plurals/verb forms)
   'fuck', 'fucks', 'fucked', 'fucking', 'fucker', 'fuckers', 'fuk', 'fvck', 'f0ck', 'fck',
   'shit', 'shits', 'shitted', 'shitting', 'sh1t', 'sht',
   'ass', 'asses', 'arse', 'arses', 'a55',
@@ -2510,7 +2491,6 @@ const BANNED_WORDS = [
   'wtf', 'stfu'
 ];
 
-// Compound words — matched as substrings (no word boundary needed)
 const BANNED_COMPOUNDS = [
   'bitchass', 'asshat', 'asswipe', 'assfuck', 'asslick', 'assface', 'asshead',
   'dickhead', 'dickheads', 'dickface', 'dickwad', 'dickweed', 'dicklick',
@@ -2526,12 +2506,10 @@ const BANNED_COMPOUNDS = [
 function filterText(text) {
   if (!text) return text;
   let filtered = text;
-  // Pass 1: compounds — substring match
   BANNED_COMPOUNDS.forEach(word => {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     filtered = filtered.replace(new RegExp(escaped, 'gi'), '*'.repeat(word.length));
   });
-  // Pass 2: single words — word boundary match
   BANNED_WORDS.forEach(word => {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     filtered = filtered.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '*'.repeat(word.length));
@@ -2563,7 +2541,6 @@ async function toggleLike(postId, btnEl) {
     await likeRef.remove();
   } else {
     await likeRef.set(true);
-    // Notify post owner
     const postSnap = await database.ref(`feed/${postId}`).once('value');
     const post = postSnap.val();
     if (post && post.uid !== uid) {
@@ -2626,7 +2603,6 @@ async function submitComment(postId) {
     text: filterText(text),
     timestamp: Date.now()
   });
-  // Notify post owner
   const postSnap = await database.ref(`feed/${postId}`).once('value');
   const post = postSnap.val();
   if (post && post.uid !== auth.currentUser.uid) {
@@ -2649,7 +2625,6 @@ function buildPostHTML(key, post, isOwner) {
   const isLiked = auth.currentUser && post.likes && post.likes[auth.currentUser.uid];
   const badge = post.isAdmin ? ' 🛡️' : (post.isPremium ? ' ✨' : '');
 
-  // Support both old single photo and new multi-photo
   const photos = post.photos ? Object.values(post.photos) : (post.photo ? [post.photo] : []);
   const photosHTML = photos.map(src => `<img class="feed-item-img" src="${src}" alt="foto" onclick="openLightbox(this.src)" style="cursor:zoom-in;">`).join('');
 
@@ -2708,13 +2683,11 @@ async function openProfile(uid, username) {
 
   const isOwnProfile = auth.currentUser && auth.currentUser.uid === uid;
 
-  // Follow button
   const followBtn = document.getElementById('profile-follow-btn');
   const dmBtn = document.getElementById('profile-dm-btn-wrap');
   const blockBtn = document.getElementById('profile-block-btn');
   if (auth.currentUser && !isOwnProfile) {
     blockBtn.style.display = 'block';
-    // Check block status
     const blockSnap = await database.ref(`blocks/${auth.currentUser.uid}/${uid}`).once('value');
     const isBlocked = blockSnap.exists();
     blockBtn.innerText = isBlocked ? '✅Atbloķēt' : '🚫Bloķēt';
@@ -2740,7 +2713,6 @@ async function openProfile(uid, username) {
     blockBtn.style.display = 'none';
   }
 
-  // Load follower/following counts
   const [followersSnap, followingSnap] = await Promise.all([
     database.ref(`followers/${uid}`).once('value'),
     database.ref(`following/${uid}`).once('value')
@@ -2748,13 +2720,11 @@ async function openProfile(uid, username) {
   document.getElementById('profile-followers-num').innerText = followersSnap.exists() ? Object.keys(followersSnap.val()).length : 0;
   document.getElementById('profile-following-num').innerText = followingSnap.exists() ? Object.keys(followingSnap.val()).length : 0;
 
-  // Reset avatar immediately
   const existingAvatar = document.getElementById('profile-avatar-lg');
   if (existingAvatar) { existingAvatar.src = ''; existingAvatar.style.display = 'none'; existingAvatar.alt = username; }
 
   const snap = await database.ref('users/' + uid).once('value');
   const u = snap.val();
-  // Fall back to user_index if no data (non-admin reading another user)
   const indexSnap = await database.ref('user_index/' + uid).once('value');
   const uData = u || indexSnap?.val();
   if (uData) {
@@ -2762,7 +2732,6 @@ async function openProfile(uid, username) {
     const bioEl = document.getElementById('profile-bio');
     if (uData.bio) { bioEl.innerText = uData.bio; bioEl.style.display = 'block'; }
     else { bioEl.style.display = 'none'; }
-    // Avatar
     const photoURL = indexSnap?.val()?.photoURL || u?.photoURL || null;
     const avatarEl = document.getElementById('profile-avatar-lg');
     if (avatarEl) {
@@ -2808,7 +2777,6 @@ async function toggleBlock() {
     await blockRef.remove();
   } else {
     await blockRef.set(true);
-    // Also unfollow both ways when blocking
     await database.ref(`followers/${theirUID}/${myUID}`).remove();
     await database.ref(`following/${myUID}/${theirUID}`).remove();
     await database.ref(`followers/${myUID}/${theirUID}`).remove();
@@ -2837,7 +2805,6 @@ async function toggleFollow() {
       uid: myUID, username: userProfile?.username || 'Lietotājs'
     });
   }
-  // Refresh counts and button
   const username = document.getElementById('profile-username').innerText;
   openProfile(theirUID, username);
 }
@@ -3018,13 +2985,11 @@ async function startDMWith(uid, username) {
   currentDMConvId = getDMConvId(auth.currentUser.uid, uid);
   closeModal('profile-modal');
   closeModal('inbox-modal');
-  // Fetch their photo to store in inbox meta
   const idxSnap = await database.ref(`user_index/${uid}/photoURL`).once('value');
   const theirPhoto = idxSnap.val() || null;
   const myUID = auth.currentUser.uid;
   const myName = userProfile?.username || auth.currentUser.displayName || 'Lietotājs';
   const myPhoto = userProfile?.photoURL || null;
-  // Update both sides with photo
   database.ref(`user_convs/${myUID}/${currentDMConvId}`).update({ otherPhotoURL: theirPhoto });
   database.ref(`user_convs/${uid}/${currentDMConvId}`).update({ otherPhotoURL: myPhoto });
   openDMChat();
@@ -3041,7 +3006,6 @@ function openDMChat() {
     container.innerHTML = '';
     const val = snap.val();
     if (val) {
-      // Mark all incoming messages as read
       Object.entries(val).forEach(([msgId, msg]) => {
         if (msg.senderUID !== auth.currentUser.uid && !msg.read) {
           database.ref(`dms/${currentDMConvId}/messages/${msgId}/read`).set(true);
@@ -3055,7 +3019,6 @@ function openDMChat() {
         const textHTML = msg.text ? `<div class="dm-bubble ${isMine ? 'sent' : 'received'}">${quoteHTML}${msg.text}</div>` : (quoteHTML ? `<div class="dm-bubble ${isMine ? 'sent' : 'received'}">${quoteHTML}</div>` : '');
         const photoHTML = msg.photo ? `<img src="${msg.photo}" onclick="openLightbox(this.src)" style="max-width:200px; border-radius:12px; margin-top:${msg.text ? '4px' : '0'}; cursor:zoom-in; display:block;">` : '';
         const receipt = isMine ? `<span style="font-size:0.65rem; opacity:0.5; margin-top:2px; display:block; text-align:right;">${msg.read ? '✓✓' : '✓'}</span>` : '';
-        const replyBtnPos = isMine ? 'left' : 'right';
         const replySnap = { senderName: msg.senderName || (isMine ? (userProfile?.username||'Tu') : currentDMOtherName), text: msg.text };
         wrap.innerHTML = `${textHTML}${photoHTML}
           <div class="dm-bubble-meta">${isMine ? 'Tu' : msg.senderName} · ${timeAgo(msg.timestamp)} <button class="reply-btn" onclick='setDMReply(${JSON.stringify(replySnap)})'>↩</button></div>
@@ -3071,8 +3034,8 @@ function openDMChat() {
 
 
 // --- REPLY STATE ---
-let dmReplyTo = null;    // { senderName, text } | null
-let grpReplyTo = null;   // { senderName, text } | null
+let dmReplyTo = null;
+let grpReplyTo = null;
 let dmPhotoBase64 = null;
 
 function buildReplyQuote(replyTo) {
@@ -3273,7 +3236,6 @@ async function initPeerConnection(convId, isCallee) {
   };
 }
 
-// Show a non-blocking notice inside the DM modal (replaces alert for call errors)
 function showDMNotice(msg) {
   let notice = document.getElementById('dm-notice');
   if (!notice) {
@@ -3296,16 +3258,12 @@ async function startCall() {
 
 async function startVideoCall() {
   isVideoCall = true;
-  // Explicitly request camera permission here — must be called directly from user gesture
-  // so the browser shows the permission prompt before we do any async Firebase work
   let hasCamera = false;
   try {
     const test = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    test.getTracks().forEach(t => t.stop()); // immediately release, we'll re-request properly below
+    test.getTracks().forEach(t => t.stop());
     hasCamera = true;
-  } catch (e) {
-    // No camera or denied — we'll proceed audio-only, handled inside _initiateCall
-  }
+  } catch (e) {}
   await _initiateCall(true);
 }
 
@@ -3318,7 +3276,6 @@ async function _initiateCall(withVideo) {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo ? { facingMode: 'user' } : false });
   } catch (e) {
     if (withVideo) {
-      // Camera unavailable — fall back to audio-only; they can still see the other person
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         showDMNotice('Kamera nav pieejama — tu nesūtīsi video, bet redzēsi otru pusi.');
@@ -3341,7 +3298,6 @@ async function _initiateCall(withVideo) {
     lv.style.display = localStream.getVideoTracks().length ? 'block' : 'none';
   } else {
     showCallBar('📞 Savienojas...');
-    // Show upgrade-to-video button for audio calls
     document.getElementById('upgrade-to-video-btn').style.display = 'flex';
   }
   await initPeerConnection(currentDMConvId, false);
@@ -3374,7 +3330,6 @@ async function _initiateCall(withVideo) {
   statusRef.on('value', snap => {
     const s = snap.val();
     if (s === 'active') {
-      // Call was answered — stop listening for declined, it can't be declined now
       statusRef.off();
       if (withVideo) {
         document.getElementById('video-connecting-overlay').style.display = 'none';
@@ -3386,7 +3341,6 @@ async function _initiateCall(withVideo) {
     if (s === 'declined') { showDMNotice('Zvans noraidīts.'); hangUp(); }
     if (s === 'ended') hangUp();
   });
-  // Listen for video upgrade signal from callee
   database.ref(`calls/${currentDMConvId}/videoUpgrade`).on('value', async snap => {
     if (snap.val() === 'requested' && !isVideoCall && peerConnection) {
       upgradeToVideo();
@@ -3399,10 +3353,8 @@ async function upgradeToVideo() {
   if (!peerConnection) return;
   try {
     const videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
-    // Stop old audio-only tracks
     if (localStream) localStream.getTracks().forEach(t => t.stop());
     localStream = videoStream;
-    // Replace tracks in peer connection
     const senders = peerConnection.getSenders();
     const audioTrack = videoStream.getAudioTracks()[0];
     const videoTrack = videoStream.getVideoTracks()[0];
@@ -3411,9 +3363,7 @@ async function upgradeToVideo() {
     else if (audioTrack) peerConnection.addTrack(audioTrack, localStream);
     if (videoTrack) peerConnection.addTrack(videoTrack, localStream);
     isVideoCall = true;
-    // Signal to other side
     await database.ref(`calls/${currentDMConvId}/videoUpgrade`).set('requested');
-    // Open video UI
     openVideoCallUI(currentDMOtherName || 'Video zvans');
     document.getElementById('local-video').srcObject = localStream;
     document.getElementById('video-connecting-overlay').style.display = 'none';
@@ -3427,13 +3377,11 @@ async function upgradeToVideo() {
 async function acceptCall() {
   document.getElementById('incoming-call-overlay').style.display = 'none';
   if (!incomingCallConvId) return;
-  // Remove the incoming_calls node immediately — this cancels the auto-decline timer
   if (auth.currentUser) database.ref(`incoming_calls/${auth.currentUser.uid}`).remove();
   const callSnap = await database.ref(`calls/${incomingCallConvId}`).once('value');
   const callData = callSnap.val();
   if (!callData) return;
   isVideoCall = incomingCallIsVideo;
-  // Receiver only needs audio — camera is optional, they still see the caller via ontrack
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   } catch (e) {
@@ -3443,7 +3391,6 @@ async function acceptCall() {
   }
   if (isVideoCall) {
     openVideoCallUI(callData.callerName || 'Video zvans');
-    // No local camera on receiver side by default — hide pip
     const lv = document.getElementById('local-video');
     lv.srcObject = null;
     lv.style.display = 'none';
@@ -3460,7 +3407,6 @@ async function acceptCall() {
   database.ref(`calls/${incomingCallConvId}/callerCandidates`).on('child_added', snap => {
     if (peerConnection) peerConnection.addIceCandidate(new RTCIceCandidate(snap.val()));
   });
-  // Listen for video upgrade request from caller
   database.ref(`calls/${incomingCallConvId}/videoUpgrade`).on('value', async snap => {
     if (snap.val() === 'requested' && !isVideoCall && peerConnection) {
       upgradeToVideo();
@@ -3477,7 +3423,6 @@ async function acceptCall() {
 function declineCall() {
   document.getElementById('incoming-call-overlay').style.display = 'none';
   if (!incomingCallConvId) return;
-  // Don't decline if the call is already active (we already accepted it)
   database.ref(`calls/${incomingCallConvId}/status`).once('value', snap => {
     if (snap.val() === 'active') { incomingCallConvId = null; return; }
     database.ref(`calls/${incomingCallConvId}/status`).set('declined');
@@ -3505,7 +3450,6 @@ async function hangUp() {
   incomingCallConvId = null;
 }
 
-// Video call controls
 function toggleVideoMic() {
   if (!localStream) return;
   videoMicMuted = !videoMicMuted;
@@ -3536,12 +3480,10 @@ async function flipCamera() {
   localStream = newStream;
 }
 
-// Listen for incoming calls globally
 function watchIncomingCalls(uid) {
   let autoDeclineTimer = null;
   database.ref(`incoming_calls/${uid}`).on('value', async snap => {
     const call = snap.val();
-    // If node was cleared (call accepted/ended), cancel any pending auto-decline
     if (!call) { clearTimeout(autoDeclineTimer); autoDeclineTimer = null; return; }
     if (call.callerUID === uid) return;
     incomingCallConvId = call.convId;
@@ -3553,7 +3495,6 @@ function watchIncomingCalls(uid) {
     document.getElementById('incoming-call-type').innerText = typeLabel;
     document.getElementById('accept-call-btn').innerText = incomingCallIsVideo ? '🎥' : '📞';
     document.getElementById('incoming-call-overlay').style.display = 'block';
-    // Auto decline after 30s if not answered
     clearTimeout(autoDeclineTimer);
     autoDeclineTimer = setTimeout(() => {
       if (document.getElementById('incoming-call-overlay').style.display === 'block') declineCall();
@@ -3585,7 +3526,6 @@ function openInbox() {
       item.innerHTML = `<div style="display:flex;align-items:center;gap:8px;"><div style="position:relative;flex-shrink:0;">${inboxAvatar}<span id="${onlineDotId}" style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-radius:50%;background:#8E8E93;border:2px solid var(--bg-panel);display:none;"></span></div><div style="flex:1;min-width:0;"><div class="inbox-item-name">${meta.otherName}</div><div class="inbox-item-preview">${meta.lastMsg || ''}</div></div></div>`;
       item.onclick = () => { currentDMConvId = id; currentDMOtherUID = meta.otherUID; currentDMOtherName = meta.otherName; closeInbox(); openDMChat(); };
       list.appendChild(item);
-      // Watch online status for this conversation
       if (meta.otherUID) {
         database.ref('status/' + meta.otherUID).once('value').then(snap => {
           const s = snap.val();
